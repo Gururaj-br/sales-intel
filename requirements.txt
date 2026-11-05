@@ -1,0 +1,13 @@
+duckdb>=2.0  # 2.0 API: lambda x: syntax, con.sql(), no fetchone on relations
+polars
+pandera
+pyyaml
+scikit-learn
+streamlit
+pytest
+tldextract
+# offline LLM step only (pipeline/classify.py); the hosted app does not need it
+groq
+# orchestrator (orchestrator/): zstandard streams the big-file split; boto3 only for storage: s3
+zstandard
+boto3

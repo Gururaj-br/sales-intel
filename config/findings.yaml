@@ -1,0 +1,64 @@
+# findings.yaml: WHAT counts as a problem on one IP+port, how bad it is, and what to sell.
+# One entry = one finding type. Pitch angle lives here so there is ONE place per finding.
+# severity: 1 (minor) .. 10 (critical). Starting guesses; tuned against the gold set later.
+# evidence: how sure we are the finding is real (0..1). Feeds confidence, not score size.
+# Findings only run on rows that passed exclusions.yaml.
+# Counts in comments = part-00 (logs/config_checks.txt, 2026-11-04).
+
+exposed_ports:        # rule: port is open on an eligible row
+  # 1433: 10,287 rows but 9,693 on CDN = proxy noise. Only ~384 real after exclusions.
+  # 5985: 7,188 rows, mostly Cogent / Tencent / Hetzner (excluded or needs attribution).
+  - {port: 3389,  name: rdp,           severity: 9, evidence: 0.9, pitch: "Attack surface mgmt / zero trust access"}
+  - {port: 445,   name: smb,           severity: 9, evidence: 0.9, pitch: "Attack surface mgmt / ransomware protection"}
+  - {port: 1433,  name: mssql,         severity: 8, evidence: 0.8, pitch: "Attack surface mgmt / database security"}
+  - {port: 5985,  name: winrm_http,    severity: 8, evidence: 0.8, pitch: "Attack surface mgmt / zero trust access"}
+  - {port: 23,    name: telnet,        severity: 8, evidence: 0.8, pitch: "Attack surface mgmt"}
+  - {port: 5900,  name: vnc,           severity: 8, evidence: 0.8, pitch: "Zero trust access"}
+  - {port: 3306,  name: mysql,         severity: 7, evidence: 0.9, pitch: "Database security"}
+  - {port: 5432,  name: postgres,      severity: 7, evidence: 0.9, pitch: "Database security"}
+  - {port: 27017, name: mongodb,       severity: 7, evidence: 0.9, pitch: "Database security"}
+  - {port: 6379,  name: redis,         severity: 7, evidence: 0.9, pitch: "Database security"}
+  - {port: 9200,  name: elasticsearch, severity: 7, evidence: 0.9, pitch: "Database security"}
+
+known_cves:           # field `vulns` = MAP(cve_id -> {cvss, epss, kev, verified, ...})
+  name: has_cve
+  severity_from: cvss # severity = max cvss of the row (0-10), not a fixed number
+  kev_bonus: 2        # +2 if any CVE has kev (known exploited) set, capped at 10
+  evidence: 0.6       # `verified` was false in the sample: version-based guesses, not proof
+  pitch: "Vulnerability management"
+
+tag_rules:            # Shodan's own tags (field `tags`). Cheap, already computed for us.
+  - {tag: eol-product, name: eol_product, severity: 7, evidence: 0.8, pitch: "Vulnerability mgmt / patching"}  # 3,801 rows
+  - {tag: eol-os,      name: eol_os,      severity: 7, evidence: 0.8, pitch: "Vulnerability mgmt / patching"}  # 2,183 rows
+  - {tag: self-signed, name: self_signed, severity: 3, evidence: 0.9, pitch: "Certificate / TLS hygiene"}      # 4,099 rows
+
+module_rules:         # exact field paths confirmed with DESCRIBE
+  - name: old_exchange
+    field: exchange_name       # ingest column (from microsoft_exchange.name)
+    match: "Exchange Server (2013|2016|2019)"  # out of support; "Exchange Server SE" is current
+    severity: 9                                # 29 rows, 16 builds in part-00
+    evidence: 0.9
+    pitch: "Patching / email security"
+  - name: old_tls
+    field: ssl_versions        # ingest column (ssl.versions), list; "-TLSv1" = NOT supported, "TLSv1" = supported
+    match_any: [SSLv2, SSLv3, TLSv1, TLSv1.1]   # exact list items, no leading "-"
+    severity: 4                                 # ~3,800 rows off-CDN
+    evidence: 0.9
+    pitch: "Certificate / TLS hygiene"
+  - name: expired_cert
+    field: cert_expired        # ingest column (ssl.cert.expired), boolean
+    match: true
+    severity: 4                # 1,732 rows off-CDN
+    evidence: 0.9
+    pitch: "Certificate / TLS hygiene"
+
+# DROPPED (data said no):
+# - mongodb_no_auth: only 11 mongodb rows in part-00, all authentication=true -> 0 hits.
+#
+# - no-login services, counted on part-00 after ingest: ftp anonymous = 3 rows,
+#   rsync no auth = 5, redis no auth = 0, clickhouse no login = 0. Too rare to be worth a
+#   rule now; ingest keeps the columns, so re-check on more parts later.
+#
+# CANDIDATES (not active yet):
+# - Exposed edge appliance: cert O = Fortinet (2,693 rows) = FortiGate admin page on the
+#   internet. Strong pitch (edge-device CVEs), but needs a count after exclusions first.

@@ -1,0 +1,27 @@
+# llm.yaml: the ONE LLM step (docs/DECISIONS.md D7): classify owner names of accounts that would be ranked.
+# Offline only: pipeline/classify.py writes data/llm/org_labels.parquet; the hosted app never calls an LLM.
+# Guardrails (CLAUDE.md): JSON output checked against labels, temperature 0, cache, "unknown"
+# fallback, gold-set check (eval/eval_orgs.py), cost logged (logs/llm_cost.csv).
+
+provider: groq
+model: openai/gpt-oss-120b     # VERIFY on console.groq.com/docs/models before the first real run
+temperature: 0
+batch_size: 40                     # names per call
+max_retries: 4                     # waits 5/10/20/40 s (rate limits), then "unknown" (not cached)
+max_wait_s: 60                     # cap on one wait
+prompt_file: prompts/org_classify_v2.md   # v2: maker names in certs = default (v1 kept for comparison)
+prompt_version: v2                 # part of the cache key: change the prompt -> bump this
+
+labels: [company, infrastructure, default, unknown]
+# score.py drops finding rows whose owner got one of these labels; "unknown" keeps the rules' answer
+drop_labels: [infrastructure, default]
+use_labels: true                   # false = pure rules baseline (for the eval comparison)
+
+price_usd_per_mtok:                # VERIFY on groq.com/pricing; used only for the cost log
+  input: 0.59
+  output: 0.79
+
+paths:
+  cache: data/llm/cache.jsonl      # one line per answered name; reruns cost nothing
+  labels: data/llm/org_labels.parquet
+  cost_log: logs/llm_cost.csv

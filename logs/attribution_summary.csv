@@ -1,0 +1,13 @@
+status,tier,attr_note,rows,pct
+eligible,A,,1891,0.4
+eligible,B,,9643,2.1
+eligible,C,,49238,10.6
+eligible,D,no_org,18,0.0
+eligible,D,no_proof,2,0.0
+eligible,D,security_vendor,4,0.0
+excluded,D,excluded,246431,53.2
+needs_attribution,A,,865,0.2
+needs_attribution,B,,7145,1.5
+needs_attribution,D,multiple_domains,693,0.1
+needs_attribution,D,no_proof,147557,31.8
+needs_attribution,D,security_vendor,4,0.0

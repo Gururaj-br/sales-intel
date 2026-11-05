@@ -1,0 +1,36 @@
+# scoring.yaml: HOW findings become one ranked account.
+#
+# score(account)      = sum over finding types of  severity * count_factor(count) * recency(age)
+# confidence(account) = attribution_weight[tier] * mean(evidence of its findings)
+#   -> computed per account from its own data; nothing is a fixed number per level.
+# if confidence < abstain_below -> status = "abstain" (shown as "not sure", never ranked high)
+
+count_factor: log2_plus_one    # 1 finding -> 1, 3 -> 2, 7 -> 3: many copies of one issue
+                               # should not drown out one different, worse issue
+
+recency:
+  half_life_days: 30           # a finding seen 30 days ago counts half
+  # Honest note: part-00 is all one day (2026-11-01), so this does almost nothing until
+  # several parts / files with different dates are combined.
+
+attribution_weight:            # how sure we are the IP belongs to this company
+  A_cert: 0.9                  # cert subject O/CN (ssl.cert.subject is a MAP: subject['O'])
+                               # not on default_cert_orgs. Only ~10k of 25k off-CDN certs have O.
+  B_hostname: 0.5              # registrable domain, not on infra_domains.
+                               # 2026-11-04: 0.7 -> 0.5. Eyeball check: only ~18/40 top tier-B
+                               # owners are real (rest hosters/ISPs). Until the LLM domain
+                               # classifier + gold set exist, domain-only owners must not rank.
+  C_org: 0.5                   # normalized org name (non-cloud/ISP/CDN only)
+  # D = unattributed -> never scored, so no weight
+  agreement:                   # two independent proofs name the same company (attribute.py)
+    bonus: 0.3                 # added to the tier weight, capped at 1.0. B or C alone: 0.5 * 0.9
+                               # evidence = 0.45 < abstain; with agreement 0.8 * 0.9 = 0.72 > abstain.
+    min_label_len: 4           # domain first label must be >= 4 chars ("ed" of ed.ac.uk never matches)
+  # These are starting priors. Eval step replaces them with measured precision per tier
+  # from the gold set (~50 hard attributions).
+
+abstain_below: 0.5             # starting value; final value picked from the
+                               # coverage-vs-precision curve in eval (precision target below)
+precision_target: 0.9          # "a wrong edge is worse than no edge"
+
+top_reasons: 3                 # reasons shown per account in the app

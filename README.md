@@ -1,0 +1,142 @@
+# Cyber Sales Intel
+
+**Find, rank and pitch companies that have visible security problems on their internet-facing servers.**
+Built from Shodan-style internet scan data for the sales team of a cybersecurity software company.
+
+**Live app:** https://sales-intel-wgbpzzn9khttipxii3r6rq.streamlit.app/ (no login, no API keys, no AI calls at view time)
+
+> **Scope of this proof of concept.** The input is one scan file of 13.5 million records (18 GB compressed).
+> The app and every number below come from its **first 500,000 records** (one of 27 equal chunks).
+> The [orchestrator](orchestrator/README.md) that splits and processes the whole file, locally or on S3, is built and
+> tested end-to-end on a small sample and against a fake S3 client; it has not yet been run on the full file or on real AWS.
+
+---
+
+## What a sales rep gets
+| Rep question | What the app shows |
+|---|---|
+| Who do I call this week? | A ranked list of companies, filterable by country, problem type and confidence, with CSV export |
+| Why this company? | Their top problems in plain words, how serious each is, and on how many servers |
+| What do I pitch? | The product to offer for each problem, why the customer should care, and a suggested opening line |
+| Can I trust it? | A confidence score, computed live from the evidence and explained as two questions. Weak cases show "not enough proof" and no score |
+| What exactly did you see? | Every finding: server IP, port, problem, technical detail and date seen |
+
+## How it works
+
+![Data flow: scan file, split, parallel processing, score, app](docs/img/data_flow.svg)
+
+![Decision flow: five checks from scan record to ranked account](docs/img/pipeline_flow.svg)
+
+**The data is not company data.** One record is one open port on one IP address at one moment, with the
+banner and parsed service details. To turn that into sales leads, the pipeline answers five questions in order:
+
+1. **Is the owner of this IP the real user?** CDN/WAF vendors, cloud landlords, ISPs, home connections,
+   honeypots and security vendors are excluded first. A problem on a Cloudflare edge is not Cloudflare's customer's
+   problem, and an ISP is not the prospect. Lists and name rules: `config/exclusions.yaml`.
+2. **Can we prove who owns it?** Three kinds of proof, strongest first:
+   **A** the TLS certificate names the organisation · **B** all hostnames point to one company domain ·
+   **C** the IP registry organisation (only where the network isn't a hoster or cloud).
+   Default device certificates, placeholder names, reverse-DNS names and hosting domains don't count as proof.
+   When two independent proofs name the same company, confidence goes up. With no proof, the record is dropped.
+3. **Is there a security problem?** Fixed, readable rules (`config/findings.yaml`):
+   known CVEs (extra weight for known-exploited ones), remote desktop / file sharing / databases / WinRM / Telnet / VNC
+   open to the internet, end-of-life software or OS, out-of-support Exchange, outdated TLS, expired or self-signed certificates.
+4. **Is the owner a real company?** An LLM labels each unique owner name once (offline, cached) as
+   *company / infrastructure / default / unknown*. This removes hosting firms and device makers whose names are printed
+   on certificates of boxes they sold (a NAS maker's certificate on a customer's NAS is not the NAS maker's server).
+5. **Are we confident enough?** `confidence = owner proof × evidence strength`. Below 0.5 the app says
+   "not enough proof" instead of guessing.
+
+**Score** (only for accounts that pass): for each problem type, `severity (0–10) × log2(servers + 1) × recency`,
+summed. More servers add points with diminishing returns, so one critical hole isn't drowned out by 50 expired certificates.
+Recency halves every 30 days. The same IP + port seen again in a later scan counts once (latest sighting wins).
+
+## What is rules, what is AI, what is ML
+| Part | Method | Why |
+|---|---|---|
+| Exclusions, ownership proof, findings, score | **Rules** in YAML | Auditable: every rank can be traced to config lines and evidence rows |
+| Owner-name clean-up | **LLM** (Groq, `openai/gpt-oss-120b`), offline | The long tail of hosting firms and device makers can't be hand-listed; hand-made lists stopped converging after several rounds of review |
+| Confidence | **Computed** per account from its own evidence rows, live in the app | Never a constant per level |
+| Machine-learning model | **None** | There are no outcome labels (won/lost deals) to train on; a model would only learn our own rules back |
+
+Guardrails on the LLM step (`pipeline/classify.py`): fixed JSON answer format checked against the allowed labels,
+temperature 0, answers cached by `hash(prompt version, model, name)`, missing or invalid answers fall back to `unknown`
+(and are retried next run), cost logged per run (`logs/llm_cost.csv`), accuracy measured on a separately labelled gold set.
+The prompt examples are checked to contain no gold-set names. Details and costs: [docs/LLM_USAGE.md](docs/LLM_USAGE.md).
+
+## Results
+Measured with `eval/eval_orgs.py` against a gold set of owner names (`eval/gold_orgs.csv`): the top-ranked accounts
+plus a random sample, each labelled company / infrastructure / default / unknown.
+
+**The funnel** (first 500,000 records):
+
+| Step | Count |
+|---|---|
+| Scan records → unique IP + port | 500,000 → 463,491 |
+| Problems found on servers with a proven owner | 15,262 |
+| Problems kept after the LLM name check | 14,690 |
+| Accounts (companies) | 6,819 |
+| Ranked (confidence ≥ 0.5) / "not enough proof" | 490 / 6,329 |
+
+**Quality** (96 gold names with a definite label; 14 more are labelled "unknown" and left out):
+
+| Measure | Rules only | Rules + LLM |
+|---|---|---|
+| Real companies in the top 25 accounts | 10 | **15** |
+| Name labels matching the gold set | 0.55 | **0.85** |
+| Junk names removed (recall) | n/a | 0.77 |
+| Removals that were right (precision) | n/a | 0.94 (2 real companies wrongly removed) |
+
+LLM cost for this run: 772 owner names, 20 calls, about $0.05 at the prices in `config/llm.yaml`.
+The gold labels were drafted with AI help and **have not yet been reviewed by a person**, so these numbers are provisional.
+Full method and history: [docs/EVALUATION.md](docs/EVALUATION.md).
+
+## Scale: hundreds to thousands of files a month
+The input is one large file (millions of records). The [orchestrator](orchestrator/README.md) treats every file the same way:
+- **split** streams it into 500k-record chunks in Hive-style folders (`bronze/source=<id>/chunk=<n>/`), never fully unpacked;
+- **process** runs ingest → exclude → find owner → find problems on each chunk in parallel workers; each chunk is independent and restartable;
+- **score** reads the small findings of all files, removes repeat sightings, and publishes the two files the app reads.
+
+The same code runs on a laptop folder or on **S3** (one line in `config/orchestrator.yaml`, plus a normal AWS login).
+In production an S3 upload event or a daily schedule starts `split`, several containers run `process`, and `score` runs once a day.
+Volume only affects split and process, which scale by adding workers. LLM cost grows only with **new** owner names, because answers are cached.
+No Spark or Airflow needed: one 500,000-record chunk was processed within a 4 GB DuckDB memory cap (ingest took 12.6 s).
+
+## Run it
+```bash
+pip install -r requirements.txt
+cp .env.example .env            # optional: GROQ_API_KEY for the LLM step
+
+# whole pipeline on one big file (local folder; add --storage s3 for S3)
+python -m orchestrator run --input /path/to/scan.json.zst --source scan_2026_11_01
+python -m orchestrator status
+
+python eval/eval_orgs.py        # quality check against the gold set
+streamlit run app/app.py        # the app (reads data/out only)
+pytest -q                       # tests
+```
+Each stage can also be run on its own (`python pipeline/<stage>.py`) for development.
+
+## Repository map
+| Path | What |
+|---|---|
+| `orchestrator/` | split / process / score / run, local or S3 ([usage](orchestrator/README.md)) |
+| `pipeline/` | one file per stage: `ingest`, `eligibility`, `attribute`, `findings`, `classify` (LLM), `score` |
+| `config/` | every rule and setting: exclusions, findings, scoring, LLM, app text, orchestrator |
+| `app/app.py` | Streamlit app (reads `data/out` only) |
+| `eval/` | gold set and evaluation script |
+| `prompts/` | LLM prompts (versioned) |
+| `tests/` | unit and end-to-end tests (fake S3 and fake LLM: no network needed) |
+| `docs/` | decisions, data profile, signals, evaluation, LLM usage, diagrams |
+| `DEV_LOG.md` | mistakes made while building, how each was caught, and the effect of each fix |
+
+## Known limits
+- **This proof of concept covers the first 500,000 of 13.5 million records.** Account counts and the ranking will change when the whole file is processed.
+- **Ownership is proven, not guessed**, so many real companies on cloud servers without a naming certificate or domain are left out. That's deliberate: a wrong lead costs more than a missed one.
+- **CVE findings come from software versions** the server reports, not from tests; the customer may already have patched. The app says so and gives these less weight.
+- **One scan is one moment in time.** Recency and "new since last scan" only become useful once several files have been loaded.
+- **The gold set is small** (about a hundred names), so quality numbers carry wide error bars.
+- **No contact data.** Contact enrichment is out of scope; the app gives the company, domain, country and evidence.
+- **Some device makers still slip through** the LLM check (e.g. software vendors whose names appear on their customers' default certificates).
+
+More: [docs/DECISIONS.md](docs/DECISIONS.md) · [docs/SIGNALS.md](docs/SIGNALS.md) · [docs/DATA_PROFILE.md](docs/DATA_PROFILE.md) · [docs/EVALUATION.md](docs/EVALUATION.md)

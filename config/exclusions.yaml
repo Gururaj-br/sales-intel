@@ -1,0 +1,300 @@
+# exclusions.yaml: WHO is never a prospect (docs/DECISIONS.md D2: exclude first, score later).
+# Every row gets exactly one outcome: excluded (with reason) | needs_attribution | eligible.
+# All values below were seen in part-00 (logs/config_checks.txt, 2026-11-04) unless marked.
+# Org matching = case-insensitive substring/regex on the RAW org string (lowercased).
+# Normalization (bottom of file) is only for building account names, not for matching.
+
+# 1) HARD exclude: never scored, even if a cert or hostname names a customer.
+#    Why: the open ports belong to the vendor/ISP, not to the customer.
+#    Rows are kept aside (not deleted) for the later "competitor install base" signal.
+hard_exclude:
+  tags: [cdn, honeypot]   # Shodan's own tags. cdn = 226,049 rows; catches 8,980 rows the
+                          # org regex misses. honeypot = 8,635 rows (mostly on Aliyun).
+  cdn_waf_orgs:           # backup when the tag is missing (80 rows matched regex but had no tag)
+    - incapsula
+    - cloudflare
+    - akamai
+    - cdnetworks          # 226 eligible rows before (round 2, top eligible orgs)
+    - ddos-guard          # attribute round 2: cert O "ddos-guard" (9)
+  cloud_edge_services:    # cloud.service values that are CDN/edge, not a customer server
+    - CLOUDFRONT          # 7,147 rows
+    - GLOBALACCELERATOR   # 595 rows
+  isp_orgs:               # telecoms / transit / residential ISPs from Q4 top orgs.
+    - telecom             # Korea Telecom, Deutsche Telekom (see "telekom"), Telecom Italia, ...
+    - telekom
+    - communications      # Comcast, Charter, Cogent, Cox, AT&T ...
+    - cablevision
+    - verizon
+    - "at&t"
+    - china mobile
+    - chunghwa
+    - "data communication business group"
+    - vnpt
+    - "vietnam posts"
+    - kpn
+    - "orange s.a."
+    - "ntt america"
+    - "so-net"
+    # round 2: top orgs still eligible after the first run (name says ISP/telecom)
+    - chinanet
+    - china unicom
+    - viettel
+    - claro
+    - fastweb
+    - proximus
+    - wind tre
+    - sk broadband
+    - telia
+    - level 3
+    - telefonica
+    - telefônica
+    - internet rimon
+    - wired isp
+    # round 4: generic ISP words
+    - broadband           # 930 rows / 190 orgs ("Pool for Broadband DSL customers", Aussie Broadband)
+    - isp                 # 226 / 76 ("Bluewin is an LIR and ISP in Switzerland")
+  # Residential: no residential field exists. Residential IPs sit on ISP orgs, so the
+  # isp_orgs list covers them. No separate rule (keep it simple).
+
+# 1b) OPTIONAL exclude: cybersecurity vendors (they sell security; pitching them is odd).
+#     Switch on/off here. Matched against the account's org name AND its attributed
+#     domain/cert org, so an account is caught however it was attributed.
+#     When enabled: false, they are scored like anyone else.
+security_vendors:
+  enabled: true
+  names:                  # seen in part-00 (Q4 org, Q5 domain, cert O)
+    - palo alto networks  # org, 617 rows
+    - trend micro         # domain trendmicro.com, 255 rows
+    - trendmicro
+    - cisco               # domain cisco.com 281, cert O "Cisco Systems Inc." 203
+    - meraki              # Cisco brand: org Meraki LLC 322, domain meraki.com 224
+    - zscaler             # cert O "Zscaler, Inc." 19 (checked on tier-A owner in attribute.py)
+    - proofpoint          # cert O "Proofpoint, Inc." 18
+    - iboss               # cert O, 6 (attribute round 3)
+    - fortinet            # as an OWNER name only; Fortinet default certs are handled
+                          # separately in default_cert_orgs (those devices belong to customers)
+
+# 2) SOFT exclude: clouds / big hosting. Scored ONLY if attribution tier A or B succeeds
+#    (real cert subject or real customer hostname). The org name alone is never enough.
+needs_attribution:
+  tags: [cloud]               # 117,912 rows
+  use_cloud_provider: true    # cloud.provider is non-null (Google, Amazon, Alibaba Cloud,
+                              # Tencent Cloud, DigitalOcean, Azure, Linode, Oracle Cloud...)
+  hosting_orgs:               # hosters without the cloud tag, from Q4
+    - google
+    - amazon
+    - aliyun
+    - alibaba
+    - microsoft
+    - tencent
+    - huawei
+    - scaleway
+    - hetzner
+    - "fly.io"
+    - digitalocean
+    - ovh
+    - linode
+    - contabo
+    - hostpapa
+    - "peg tech"
+    # round 2: hosters still eligible after the first run
+    - ionos
+    - godaddy
+    - hostdime
+    - m247
+    - sakura internet
+    - power line datacenter
+    - ctg server
+    - international business machines   # isp = IBM Cloud
+    # round 4: generic hosting WORDS (word-start match), after attribute.py showed hosters
+    # agreeing with their own domains (HostGator, A2 Hosting...). Eligible rows hit in ():
+    - hosting             # 853 rows / 190 orgs (InMotion, A2, ZAP-Hosting, Rackspace)
+    - host                # 1,595 / 346 (HostGator, Host Europe, HOSTKEY)
+    - server              # 613 / 133 (also "servers": Servers.com, Cherry Servers)
+    - datacenter          # 118 / 37
+    - data center         # 268 / 38 (Ace Data Centers)
+    - vps                 # 151 / 39
+    - colocation          # 60 / 9   NOT "colo": hits Telmex Colombia, Flexential Colorado
+    - dedicated           # 82 / 32
+    - cloud computing     # NOT "cloud" alone: would hit real SaaS (Cloudera)
+    - cloud service
+    # NOT added (mixed real/infra in top hits): internet, network(s), web -> LLM org classifier
+  # Unknown big orgs: we could not tell if they are a real company or a hoster/ISP, so we
+  # do not trust the org name alone (abstain > guess). EXACT whole-name match, because
+  # "ace" as a word match would also hit "Ace Hardware". Reason = unclassified_org.
+  # To be replaced by the LLM org classifier + gold set later.
+  unclassified_orgs:          # part-00 eligible rows before this list in ()
+    - "ACE"                           # (3,954)
+    - "ACEVILLE PTE.LTD."             # (2,333)
+    - "Meteverse Limited."            # (2,388)
+    - "METEVERSE LIMITED"             # (1,765)
+    - "LUOGELANG (FRANCE) LIMITED"    # (216)
+    - "eSited Solutions"              # (255)
+    - "CloudIP LLC"                   # (498)
+    - "Internet Utilities NA LLC"     # (562)
+    - "End User Organization"         # (239)
+    - "Aviation RE LLC"               # (571 + 167)
+    - "AviationAI"                    # (245)
+    - "Quality Technology Services, LLC"  # (191)
+  # NOT on any list on purpose: orgs like ServiceNow, Walmart, Palo Alto Networks, Fiserv,
+  # Egnyte show up with isp = Google LLC. Their org is the real customer -> tier C works.
+
+# 3) Hostname domains that belong to infrastructure, not to an owner (top of Q5).
+#    A hostname on this list never counts as tier-B attribution. "hostname != owner".
+infra_domains:
+  # cloud / hosting
+  - googleusercontent.com
+  - 1e100.net
+  - amazonaws.com
+  - cloudfront.net
+  - awsglobalaccelerator.com
+  - hwclouds-dns.com
+  - scw.cloud
+  - flyio.net
+  - your-server.de
+  - linodeusercontent.com
+  - vultrusercontent.com
+  - contaboserver.net
+  - ovh.net
+  - secureserver.net
+  - unifiedlayer.com
+  - colocrossing.com
+  - sl-reverse.com
+  - ctcdn.cn
+  - sakura.ne.jp
+  - dattaweb.com
+  # ISP reverse-DNS
+  - hinet.net
+  - spectrum.com
+  - t-ipconnect.de
+  - telecomitalia.it
+  - kpn.net
+  - vnpt.vn
+  - viettel.vn
+  - comcast.net
+  - comcastbusiness.net
+  - cox.net
+  - verizon.net
+  - sbcglobal.net
+  - sfr.net
+  - wanadoo.fr
+  - proxad.net
+  - orange.es
+  - btcentralplus.com
+  - belgacom.be
+  - ttnet.com.tr
+  - rima-tde.net
+  - megapath.net
+  - ctinets.com
+  - batelco.jo
+  - ocn.ne.jp
+  - nuro.jp
+  # attribute round 2: top tier-B domains that are clouds / site builders / dynamic DNS
+  - windows.net           # azurewebsites
+  - azure.com
+  - azure.net
+  - aws.dev
+  - appdomain.cloud       # IBM Cloud
+  - cloudwaysapps.com
+  - jamfcloud.com
+  - weebly.com
+  - bluehost.com
+  - nazwa.pl
+  - seedbox.vip
+  - duckdns.org           # dynamic DNS: anyone can make a name
+  # attribute round 3 (last hand round; the long tail is for the LLM domain classifier)
+  - cloudapp.net          # Azure
+  - trafficmanager.net    # Azure
+  - inmotionhosting.com
+  - web-hosting.com
+  - maxhost.io
+  - stableserver.net
+  - cyon.net
+  - locaweb.com.br
+  - brightspot.cloud
+  - draytek.com           # router dynamic DNS
+  - tpnet.pl              # ISP
+  - inet.co.th            # ISP
+  - com.ru                # not a registrable company domain
+  - test.com
+  - example.com
+  # junk values
+  - localhost
+  - adsl
+  - default.com
+  # This list only covers the top 60 of part-00. The long tail (thousands of files) is the
+  # job of the planned LLM domain classifier (cached, gold-set checked), not a longer list.
+
+# 4) Cert subject orgs that are factory defaults, not the owner (top of cert O off-CDN).
+#    A cert with one of these never counts as tier-A attribution.
+default_cert_orgs:
+  - fortinet              # 2,693 rows: FortiGate default cert (CN "support")
+  - huawei
+  - default company ltd   # OpenSSL default
+  - acme co               # Go / test default
+  - internet widgits pty ltd   # OpenSSL default (seen in 2k-row sample)
+  - fit2cloud
+  - linuxserver.io
+  - "天翼云科技有限公司"     # China Telecom cloud
+  # attribute round 1 (cert O on non-excluded rows, part-00): device / panel factory certs.
+  # The box belongs to a customer, but the cert names the maker -> not the owner.
+  - draytek               # 48
+  - ubiquiti              # 44 + 13
+  - synology              # 27
+  - sonicwall             # 13 ("HTTPS Management Certificate for SonicWALL")
+  - plesk                 # 74 (hosting control panel)
+  - bt-panel              # 14 (hosting control panel)
+  - hestia control panel  # 22
+  # attribute round 2 (top tier-A owners that were makers, not owners)
+  - zyxel                 # 10
+  - watchguard            # 10
+  - zte                   # 15
+  - fastpanel             # 9 (panel)
+  - openshift             # 10 (platform default cert)
+  - hp                    # 10 (iLO / printer default cert)
+  # attribute round 3: hardware makers (BMC / radio / firewall / printer factory certs)
+  - super micro           # 6
+  - cambium               # 6
+  - stormshield           # 6
+  - zebra technologies    # 5
+default_cert_orgs_exact:  # placeholders: WHOLE name only ("na" as a word would hit "National Grid").
+                          # Compared after org_normalize, so "My Company Ltd" == "my company".
+  - someorganization      # 32
+  - mycompany             # 24
+  - unspecified           # 23
+  - droplet               # 20 (DigitalOcean default)
+  - "na"                  # 17
+  - "xx"                  # 15
+  - "hw"                  # 15
+  - organization          # 12
+  - unknown               # attribute round 2: 11
+  - my company            # 8
+  - waf                   # 8
+  - none                  # attribute round 3: 6
+  - common                # 6
+default_cert_cns: ["support", "*", "localhost"]
+
+# 5) How attribution picks an owner (pipeline/attribute.py). Tiers: A cert O > B domain > C org.
+attribution:
+  # A cert O or B domain that names a CDN / hoster / ISP (the lists above) is never an owner:
+  # "CloudFlare, Inc." cert or "linode.com" hostname just means "hosted there".
+  reject_infra_names: true
+  # Reverse-DNS rule: a hostname that contains all 4 parts of its own IPv4
+  # (static.152.82.88.23.clients.your-server.de) is a machine name made by a hoster/ISP.
+  # part-00: 126,389 of 192,037 hostnames on scorable rows. Replaces an endless ISP domain list.
+  reverse_dns_rule: true
+  # round 2: ISPs hide the IP in other ways, so a hostname is ALSO reverse-DNS when it has
+  # >= 3 of the IP's numbers (compared as numbers: "090" == 90; dsl081-224-136.speakeasy.net),
+  # or the IP in hex (ool-2f153e12.static.optonline.net), or one of these whole labels
+  # (labels = parts between "." and "-"): customer.chcoilx1.isp.starlink.com
+  reverse_dns_words: [static, dynamic, dyn, pool, pools, dsl, adsl, cable, modemcable, cpe,
+                      customer, cust, dhcp, broadband, client, clients, ppp, isp, residential]
+  # More than one real domain left on one IP+port (shared hosting) -> we cannot tell
+  # which site owns the server -> no tier B (abstain > guess).
+  abstain_on_multiple_domains: true
+
+# Org string normalization (so "ServiceNow, Inc." == "SERVICENOW, INC.").
+org_normalize:
+  lowercase: true
+  strip_punctuation: true
+  strip_suffixes: [inc, llc, ltd, limited, corp, corporation, co, gmbh, plc, sa, sas, ag, bv, pty, pte]

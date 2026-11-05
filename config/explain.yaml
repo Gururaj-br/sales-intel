@@ -1,0 +1,124 @@
+# explain.yaml: plain-language text the app shows to sales reps (non-technical).
+# One entry per finding name in findings.yaml. Edit freely: wording only, no effect on scores.
+#   title  short plain name
+#   what   what we saw, in plain words
+#   why    why the customer should care (business risk)
+#   talk   a suggested, non-accusing way to open the conversation
+
+findings:
+  rdp:
+    title: Remote desktop open to the internet
+    what: A Windows remote-login screen can be reached by anyone on the internet.
+    why: This is one of the most common ways ransomware gangs get in, by guessing or reusing passwords.
+    talk: "Public scan data shows a remote-desktop login reachable from the internet. Is that intentional, or would it help to put it behind secure access?"
+  smb:
+    title: Windows file sharing open to the internet
+    what: Windows file sharing (normally only used inside an office) can be reached from the internet.
+    why: Famous ransomware outbreaks (e.g. WannaCry) spread exactly this way.
+    talk: "We noticed Windows file sharing reachable from the public internet. Teams usually want to close that quickly; can we help check it?"
+  mssql:
+    title: Database login open to the internet
+    what: A Microsoft SQL database accepts connections from anywhere on the internet.
+    why: Databases hold customer and business data; an exposed login invites password-guessing and data theft.
+    talk: "A database login is visible from the internet. Would a quick review of what is exposed be useful?"
+  mysql:
+    title: Database login open to the internet
+    what: A MySQL database accepts connections from anywhere on the internet.
+    why: Databases hold customer and business data; an exposed login invites password-guessing and data theft.
+    talk: "A database login is visible from the internet. Would a quick review of what is exposed be useful?"
+  postgres:
+    title: Database login open to the internet
+    what: A PostgreSQL database accepts connections from anywhere on the internet.
+    why: Databases hold customer and business data; an exposed login invites password-guessing and data theft.
+    talk: "A database login is visible from the internet. Would a quick review of what is exposed be useful?"
+  mongodb:
+    title: Database open to the internet
+    what: A MongoDB database can be reached from the internet.
+    why: Exposed MongoDB databases are often found and copied or held to ransom by automated attackers.
+    talk: "A database is reachable from the internet. Would a quick review of what is exposed be useful?"
+  redis:
+    title: Data store open to the internet
+    what: A Redis data store can be reached from the internet.
+    why: Redis is built for private networks; on the internet it can leak data or be taken over.
+    talk: "An internal data store looks reachable from the internet. Is that expected?"
+  elasticsearch:
+    title: Search database open to the internet
+    what: An Elasticsearch database can be reached from the internet.
+    why: Many large data leaks came from Elasticsearch left open to the internet.
+    talk: "A search database is reachable from the internet. Would a quick review of what is exposed be useful?"
+  winrm_http:
+    title: Windows remote management open to the internet
+    what: A Windows remote-control service (WinRM) can be reached from the internet, without encryption.
+    why: Attackers use it to run commands on servers once they have a password.
+    talk: "A Windows remote-management port is reachable from the internet. Would secure remote access be relevant for you?"
+  telnet:
+    title: Old unencrypted remote login open
+    what: Telnet, a 1980s remote login that sends passwords in plain text, is reachable from the internet.
+    why: Anyone listening can read the password; it is a favourite target of botnets.
+    talk: "An old, unencrypted login service (Telnet) is visible from the internet. Is that a known legacy device?"
+  vnc:
+    title: Remote screen sharing open to the internet
+    what: A remote screen-sharing service (VNC) can be reached from the internet.
+    why: It can give an outsider full control of a desktop if the password is weak.
+    talk: "A remote screen-sharing service is visible from the internet. Would secure remote access help?"
+  has_cve:
+    title: Software with known security holes
+    what: The software version this server reports has publicly known vulnerabilities (CVEs). "Known-exploited" means attackers are actively using them.
+    why: Known holes are what attackers scan for first; known-exploited ones are an urgent patching item.
+    talk: "Based on the software versions visible from the internet, a few servers may be missing security patches. Could we share what we see?"
+  eol_product:
+    title: Software past its end of life
+    what: The server runs software the vendor no longer supports or patches.
+    why: New security holes in it will never be fixed.
+    talk: "Some internet-facing software appears to be past vendor support. Is an upgrade or patching plan in place?"
+  eol_os:
+    title: Operating system past its end of life
+    what: The server runs an operating system the vendor no longer supports.
+    why: New security holes in it will never be fixed.
+    talk: "Some internet-facing servers appear to run an unsupported operating system. Is a refresh planned?"
+  self_signed:
+    title: Self-made security certificate
+    what: The website's security certificate was made by the server itself, not by a trusted authority.
+    why: Visitors get browser warnings, and it makes it easier to fake the site.
+    talk: "A few of your web services use self-made certificates. Would central certificate management be useful?"
+  old_exchange:
+    title: Out-of-support Microsoft Exchange email server
+    what: An Exchange email server version that Microsoft no longer supports is on the internet.
+    why: Exchange servers were hit by several mass attacks (e.g. ProxyLogon); unsupported ones get no fixes.
+    talk: "Your email server version appears to be out of Microsoft support. Is a migration or protection plan in place?"
+  old_tls:
+    title: Outdated encryption allowed
+    what: The server still accepts old encryption versions (TLS 1.0/1.1 or SSL) that are no longer considered safe.
+    why: Weak encryption can let traffic be read; it also fails many compliance checks (e.g. PCI DSS).
+    talk: "Some servers still accept outdated encryption, which many audits flag. Would a quick hygiene review help?"
+  expired_cert:
+    title: Expired security certificate
+    what: The website's security certificate has expired.
+    why: Visitors see "not secure" warnings and may lose trust; it often signals nobody is tracking certificates.
+    talk: "One of your sites shows an expired certificate. Would automated certificate tracking be useful?"
+
+severity_words:        # severity 0-10 -> word (first band where severity >= min)
+  - {min: 9, word: critical}
+  - {min: 7, word: high}
+  - {min: 4, word: medium}
+  - {min: 0, word: low}
+
+confidence_words:      # confidence -> word
+  - {min: 0.8, word: High}
+  - {min: 0.65, word: Medium}
+  - {min: 0.0, word: Low}
+
+owner_proof:           # main owner proof (attribute.py tier) in plain words
+  A: the server's security certificate carries their company name
+  B: the server's web addresses all belong to one company domain
+  C: the internet registry lists them as the owner of these IP addresses
+
+evidence_note: >-
+  Each kind of problem has its own reliability. Things read straight from the server
+  (an open port, an expired certificate, old encryption) are very reliable (0.8 to 0.9).
+  Known security holes are guessed from the software version the server reports, so they
+  are less certain (0.6): the customer may already have patched them.
+
+tone: >-
+  Share this as an observation from public internet scan data, not an accusation.
+  Do not say we tested or attacked them. Offer to send the evidence list.

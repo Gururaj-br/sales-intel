@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 270" width="860" height="270" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title>Data flow: one big scan file, split into chunks, processed in parallel, scored, served</title>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8b949e"/>
+    </marker>
+    <style>
+      .h { font-size: 13.5px; font-weight: 700; fill: #1f2328; }
+      .s { font-size: 11px; fill: #57606a; }
+      .w { font-size: 10px; fill: #57606a; }
+      .layer { font-size: 10px; font-weight: 700; fill: #ffffff; letter-spacing: .8px; }
+      .ln { stroke: #8b949e; stroke-width: 1.5; fill: none; marker-end: url(#a); }
+      .lane { stroke: #c9d1d9; stroke-width: 1; stroke-dasharray: 3 3; }
+    </style>
+    <!-- packet routes: file -> split -> one of 3 workers -> score -> app -->
+    <path id="r1" d="M118,128 L262,128 L318,92 L520,92 L576,128 L742,128"/>
+    <path id="r2" d="M118,128 L262,128 L318,128 L520,128 L576,128 L742,128"/>
+    <path id="r3" d="M118,128 L262,128 L318,164 L520,164 L576,128 L742,128"/>
+  </defs>
+
+  <rect width="860" height="270" rx="14" fill="#ffffff"/>
+  <text x="20" y="30" font-size="17" font-weight="700" fill="#1f2328">Data flow</text>
+  <text x="20" y="49" class="s">One big file in. Chunks are processed in parallel, so more files only need more workers.</text>
+
+  <!-- nodes -->
+  <rect x="20"  y="98" width="98" height="60" rx="9" fill="#fbf3ea" stroke="#b07a45" stroke-width="1.5"/>
+  <text x="69" y="116" class="h" text-anchor="middle">Scan file</text>
+  <text x="69" y="148" class="s" text-anchor="middle">local or S3</text>
+
+  <rect x="164" y="98" width="98" height="60" rx="9" fill="#fbf3ea" stroke="#b07a45" stroke-width="1.5"/>
+  <text x="213" y="116" class="h" text-anchor="middle">Split</text>
+  <text x="213" y="148" class="s" text-anchor="middle">into chunks</text>
+
+  <rect x="318" y="68" width="202" height="120" rx="9" fill="#f1f4f7" stroke="#7d8a99" stroke-width="1.5"/>
+  <text x="419" y="84" class="h" text-anchor="middle" font-size="12.5">Process (parallel workers)</text>
+  <line x1="326" y1="92"  x2="512" y2="92"  class="lane"/>
+  <line x1="326" y1="128" x2="512" y2="128" class="lane"/>
+  <line x1="326" y1="164" x2="512" y2="164" class="lane"/>
+  <text x="419" y="106" class="w" text-anchor="middle">clean · exclude · find owner · find problems</text>
+  <text x="419" y="142" class="w" text-anchor="middle">clean · exclude · find owner · find problems</text>
+  <text x="419" y="178" class="w" text-anchor="middle">clean · exclude · find owner · find problems</text>
+
+  <rect x="576" y="98" width="110" height="60" rx="9" fill="#fdf6dc" stroke="#c9a227" stroke-width="1.5"/>
+  <text x="631" y="116" class="h" text-anchor="middle">Score</text>
+  <text x="631" y="148" class="s" text-anchor="middle">+ AI name check</text>
+
+  <rect x="742" y="98" width="98" height="60" rx="9" fill="#e2f3e8" stroke="#3f9b62" stroke-width="1.5"/>
+  <text x="791" y="116" class="h" text-anchor="middle">App</text>
+  <text x="791" y="148" class="s" text-anchor="middle">ranked accounts</text>
+
+  <path class="ln" d="M118,128 L162,128"/>
+  <path class="ln" d="M262,128 L316,128"/>
+  <path class="ln" d="M520,128 L574,128"/>
+  <path class="ln" d="M686,128 L740,128"/>
+
+  <!-- layer bars -->
+  <rect x="20"  y="204" width="242" height="18" rx="5" fill="#b07a45"/>
+  <text x="141" y="217" class="layer" text-anchor="middle">BRONZE · raw chunks</text>
+  <rect x="318" y="204" width="202" height="18" rx="5" fill="#7d8a99"/>
+  <text x="419" y="217" class="layer" text-anchor="middle">SILVER · clean tables</text>
+  <rect x="576" y="204" width="110" height="18" rx="5" fill="#c9a227"/>
+  <text x="631" y="217" class="layer" text-anchor="middle">GOLD</text>
+  <rect x="742" y="204" width="98" height="18" rx="5" fill="#3f9b62"/>
+  <text x="791" y="217" class="layer" text-anchor="middle">SERVE</text>
+  <text x="20" y="250" class="s">Same folder layout on a laptop and on S3: bronze/source=…/chunk=…/ · silver/&lt;stage&gt;/source=…/chunk=…/ · gold/</text>
+
+  <!-- moving packets: colour follows the layer they are in -->
+  <g>
+    <rect x="-7" y="-5" width="14" height="10" rx="2.5">
+      <animateMotion dur="4.5s" repeatCount="indefinite" begin="-0s"><mpath href="#r1"/></animateMotion>
+      <animate attributeName="fill" dur="4.5s" repeatCount="indefinite" begin="-0s" calcMode="discrete"
+               values="#b07a45;#7d8a99;#c9a227;#3f9b62" keyTimes="0;0.36;0.72;0.86"/>
+    </rect>
+    <rect x="-7" y="-5" width="14" height="10" rx="2.5">
+      <animateMotion dur="4.5s" repeatCount="indefinite" begin="-1.5s"><mpath href="#r2"/></animateMotion>
+      <animate attributeName="fill" dur="4.5s" repeatCount="indefinite" begin="-1.5s" calcMode="discrete"
+               values="#b07a45;#7d8a99;#c9a227;#3f9b62" keyTimes="0;0.36;0.72;0.86"/>
+    </rect>
+    <rect x="-7" y="-5" width="14" height="10" rx="2.5">
+      <animateMotion dur="4.5s" repeatCount="indefinite" begin="-3s"><mpath href="#r3"/></animateMotion>
+      <animate attributeName="fill" dur="4.5s" repeatCount="indefinite" begin="-3s" calcMode="discrete"
+               values="#b07a45;#7d8a99;#c9a227;#3f9b62" keyTimes="0;0.36;0.72;0.86"/>
+    </rect>
+  </g>
+</svg>

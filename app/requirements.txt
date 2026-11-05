@@ -1,0 +1,5 @@
+# Hosted app only (Streamlit Community Cloud reads this file next to app.py).
+# It reads data/out/*.parquet + config/scoring.yaml; no LLM SDK, no keys.
+streamlit==1.66.1
+polars==2.1.0
+pyyaml==6.0.3

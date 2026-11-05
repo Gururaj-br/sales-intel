@@ -1,0 +1,17 @@
+data/raw/
+data/parquet/
+data/out/*.duckdb
+*.zst
+.env
+__pycache__/
+.venv/
+.streamlit/secrets.toml
+data/sample/
+.pytest_cache/
+.vscode/
+.claude/
+logs/config_checks.txt
+data/lake/
+data/work/
+data/input/
+logs/full_run.log

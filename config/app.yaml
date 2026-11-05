@@ -1,0 +1,12 @@
+# app.yaml: settings for the Streamlit app (app/app.py).
+# The app always reads only data/out/*.parquet (precomputed).
+
+chat:                      # optional "Ask" box: a rep types a request in plain words
+  enabled: false           # default OFF: no LLM call, no API key needed (safe for the hosted link)
+  # When true: the LLM ONLY turns the question into the sidebar filters (country, finding type,
+  # name, min confidence) as JSON; the app applies them to data/out. It never writes SQL or free answers.
+  # Guardrails (CLAUDE.md): JSON schema, temperature 0, cache, "unknown" fallback, cost logged.
+  # Key: GROQ_API_KEY from env / .env locally, or Streamlit secrets when hosted. Never in the repo.
+  provider: groq
+  model: openai/gpt-oss-120b
+  temperature: 0

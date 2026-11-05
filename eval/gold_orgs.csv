@@ -1,0 +1,111 @@
+name,source,sample,baseline_rank,label,note,reviewed
+Bitnami,cert,top60,1,default,app stack default cert,no
+Broadcom,cert,top60,2,company,CHECK: may be Brocade/Emulex device cert,no
+Broadcom Inc.,cert,top60,2,company,CHECK: as above,no
+Link3-Technologies-Ltd,org,top60,3,infrastructure,Bangladesh ISP,no
+Link3 Technologies Limited,org,top60,3,infrastructure,Bangladesh ISP,no
+LaCie SA,cert,top60,4,default,NAS factory cert,no
+Issabel,cert,top60,5,default,PBX distro default,no
+"Medidata Solutions, Inc.",cert,top60,6,company,,no
+SERVICO FEDERAL DE PROCESSAMENTO DE DADOS (SERPRO),cert,top60,7,company,,no
+SERVICO FEDERAL DE PROCESSAMENTO DE DADOS SERPRO,cert,top60,7,company,Brazil federal IT,no
+SERVICO FEDERAL DE PROCESSAMENTO DE DADOS - SERPRO,org,top60,7,company,,no
+KAGOYA-JAPAN,cert,top60,8,infrastructure,JP hosting,no
+KAGOYA JAPAN Inc.,org,top60,8,infrastructure,JP hosting,no
+CIA DE PROCESSAMENTO DE DADOS DO ESTADO DE SAO PAULO - PRODESP,cert,top60,9,company,Sao Paulo state IT,no
+CentOS Web Panel,cert,top60,10,default,control panel,no
+IT,cert,top60,11,default,placeholder,no
+University of Florida,cert,top60,12,company,,no
+McMaster University,org,top60,13,company,,no
+Oracle Corporation,cert,top60,14,company,,no
+ORACLE CORPORATION,cert,top60,14,company,,no
+UNIVERSIDADE FEDERAL DO RIO GRANDE DO SUL,cert,top60,15,company,,no
+Universidade Federal do Rio Grande do Sul,org,top60,15,company,,no
+Bitrix,cert,top60,16,default,CMS default,no
+Axentraserver Default Certificate 863B4AB,cert,top60,17,default,NAS default,no
+Spice Shed Inc.,cert,top60,18,company,,no
+LargeHostCollider,cert,top60,19,unknown,CHECK: sounds like hosting,no
+KeyConsultas,cert,top60,20,unknown,CHECK,no
+"Beijing Baidu Netcom Science Technology Co., Ltd.",cert,top60,21,company,,no
+"VMware, Inc",cert,top60,22,default,CHECK: ESXi default cert,no
+VMware,cert,top60,22,default,CHECK: ESXi/vCenter default cert O,no
+Free SAS (ProXad),org,top60,23,infrastructure,FR ISP,no
+CIG,cert,top60,24,unknown,,no
+ExpressVPN,cert,top60,25,infrastructure,CHECK: VPN endpoints,no
+Pusat Data Dan Teknologi Informasi,cert,top60,26,company,ID gov data centre dept,no
+VIMAR Spa,cert,top60,27,default,CHECK: home-automation device cert,no
+Lincolnshire Co-operative Limited,cert,top60,28,company,,no
+浙江金瑞泓科技股份有限公司,cert,top60,29,company,wafer maker,no
+Heimer Automatizacion SA de CV,cert,top60,30,company,,no
+MONGERAL AEGON SEGUROS E PREVIDENCIA S/A,cert,top60,31,company,insurer,no
+Sollutium-NL SOLLUTIUM EU Sp z.o.o.,org,top60,32,infrastructure,hosting,no
+Dell Inc.,cert,top60,33,default,CHECK: iDRAC default cert,no
+OrgName,cert,top60,34,default,placeholder,no
+Data2,cert,top60,35,unknown,,no
+Personal,cert,top60,36,default,placeholder,no
+KaonBroadband,cert,top60,37,default,CPE/router maker,no
+Bizhost,cert,top60,38,infrastructure,hosting,no
+Volodymyr Zelenskyy,cert,top60,39,default,junk value,no
+127.0.0.1,cert,top60,40,default,junk value,no
+Woodlo,cert,top60,41,unknown,,no
+V2Ray Inc,cert,top60,42,default,"proxy software, fake org",no
+Companyname,cert,top60,43,default,placeholder,no
+CompanyName,cert,top60,43,default,placeholder,no
+Soochow University,cert,top60,44,company,,no
+Webhuset AS,org,top60,45,infrastructure,NO hosting,no
+"McDonogh School, INC.",cert,top60,46,company,,no
+Ministero degli Affari Esteri e Cooperazione Internazionale,cert,top60,47,company,,no
+Department of Agricultural Extension,cert,top60,48,company,,no
+BRITISH BROADCASTING CORPORATION,cert,top60,49,company,,no
+Apache Haus Distribution Test Certificate,cert,top60,50,default,test cert,no
+Calmini,cert,top60,51,unknown,,no
+Tesis-OyS,cert,top60,52,unknown,,no
+Invacare Corporation,org,top60,53,company,,no
+DAOL SECURITIES (THAILAND) PUBLIC COMPANY LIMITED,cert,top60,54,company,,no
+"NIPPON COLUMBIA CO.,LTD.",cert,top60,55,company,,no
+National Chengchi University,cert,top60,56,company,,no
+"Ministerio de Ciencia, Tecnologia e Innovacion",cert,top60,57,company,,no
+"SAMSUNG ELECTRONICS CO,.LTD",cert,top60,58,unknown,CHECK: as above,no
+Samsung Electronics,cert,top60,58,unknown,CHECK: company or device cert,no
+SITA,cert,top60,59,company,airline IT,no
+KAIRA DISTRICT CO-OPERATIVE MILK PRODUCERS UNION LIMITED,cert,top60,60,company,Amul,no
+LiteSpeedCommunity,cert,random,78,default,web server default,no
+ARNES,org,random,93,infrastructure,SI research network,no
+Panasonic Avionics Corporation,cert,random,98,company,,no
+Bahon Limited,org,random,119,unknown,,no
+Gabriels Technology Solutions,cert,random,126,company,,no
+ExpressHost Ltd,org,random,133,infrastructure,hosting,no
+Blacknight Internet Solutions Limited,org,random,136,infrastructure,IE hosting,no
+Medisource LLC,cert,random,140,company,,no
+Internet2,org,random,149,infrastructure,US research network,no
+Uplevel Systems Inc,cert,random,151,unknown,CHECK: SMB network appliance maker,no
+NSB,cert,random,172,unknown,,no
+PrivateSystems Networks GA,org,random,178,infrastructure,hosting,no
+The Revenue Department,cert,random,180,company,TH gov,no
+ATUL LIMITED,cert,random,261,company,,no
+"Česká spořitelna, a.s.",cert,random,286,company,bank,no
+BAcloud,org,random,288,infrastructure,hosting,no
+Vilodent 98 Kft.,cert,random,362,company,,no
+gisuni,cert,random,374,unknown,,no
+Central Michigan University,cert,random,405,company,,no
+Nanjing University,cert,random,411,company,,no
+AZION TECHNOLOGIES,cert,random,414,infrastructure,edge/CDN,no
+Hillstone Networks,cert,random,420,default,firewall factory cert,no
+mitelis.net - Reliable Anti-DDoS protection for your business,org,random,424,infrastructure,anti-DDoS hosting,no
+Linux Containers,cert,random,431,default,LXD default cert,no
+"CDK Global, LLC",cert,random,439,company,,no
+影石创新科技股份有限公司,cert,random,466,company,Insta360,no
+City of Chicago,cert,random,479,company,,no
+SAP America Inc.,cert,random,482,company,,no
+ADMINISTRACION NACIONAL MEDICAMENTOS ALIMENTOS TECNOLOGIA MEDICA,cert,random,505,company,AR gov,no
+"AB ""Lietuvos geležinkeliai""",cert,random,534,company,LT railways,no
+Mississippi Department of Information Technology Services,cert,random,544,company,,no
+NTT DATA Spain SL,cert,random,563,company,,no
+AstraZeneca Pharmaceuticals LP,cert,random,579,company,,no
+Globalgiving Foundation Inc.,cert,random,612,company,,no
+AGENCIA NACIONAL DE MINERIA,cert,random,621,company,,no
+深圳美西西餐饮管理有限公司,cert,random,652,company,restaurant group,no
+nfrance.com,cert,random,691,infrastructure,FR hosting,no
+Cosmonova LLC,org,random,716,unknown,,no
+Python,cert,random,722,default,placeholder,no
+Comnet Bulgaria Holding Ltd.,org,random,734,infrastructure,BG ISP,no

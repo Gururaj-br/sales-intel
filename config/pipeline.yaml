@@ -1,0 +1,37 @@
+# pipeline.yaml: WHERE files are and HOW to read them. No business rules here.
+
+paths:
+  raw: data/raw            # bronze: part-XX.json.zst, never edited
+  parquet: data/parquet    # silver: one file per part per stage
+  out: data/out            # gold: the only thing the app reads
+  observations: data/parquet/observations   # ingest output: one parquet per part
+  manifest: data/parquet/observations/_manifest.csv   # which parts are done (bronze stays untouched)
+  eligibility: data/parquet/eligibility     # observations + status + reason, one file per part
+  attribution: data/parquet/attribution     # eligibility + owner tier / name / key / weight, one file per part
+  findings: data/parquet/findings           # one row per (ip, port, finding) on attributed rows
+
+raw_glob: "part-*.json.zst"   # VERIFIED: actual filenames in data/raw
+
+# Laptop-safe DuckDB limits (default = ~80% RAM, which froze the laptop once).
+duckdb:
+  memory_limit: 4GB
+  threads: 4
+  temp_directory: data/sample/duckdb_tmp
+
+# DuckDB read_json options. VERIFIED gotchas (see CLAUDE.md).
+# ingest.py passes an explicit column list, so DuckDB does NOT guess the schema
+# (no sample_size needed) and only the fields we pick are kept. Heavy fields such as
+# http.html and tcp.raw are simply never selected.
+read_json:
+  format: newline_delimited
+  maximum_object_size: 33554432 # some records are huge (32 MB cap)
+  ignore_errors: true
+
+# The `data` field = raw banner text (decision D6).
+banner:
+  keep_chars: 500    # store only this much as `banner`
+  low_evidence_patterns:   # banners that say nothing useful
+    - "SSL Error"
+    - "400 Bad Request"
+  # Regex version fallback over the first 2KB is NOT built yet: Shodan already gives
+  # product / version / cpe23 / http.server. Add it only if findings show gaps.

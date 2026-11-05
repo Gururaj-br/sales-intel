@@ -1,0 +1,8 @@
+status,reason,rows,pct
+excluded,cdn_waf,200031,43.2
+needs_attribution,cloud_hosting,141704,30.6
+eligible,,60796,13.1
+excluded,isp,36161,7.8
+needs_attribution,unclassified_org,14560,3.1
+excluded,honeypot,8583,1.9
+excluded,security_vendor,1656,0.4

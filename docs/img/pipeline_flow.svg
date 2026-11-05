@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 270" width="860" height="270" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title>Decision flow: five checks from scan record to ranked account</title>
+  <defs>
+    <style>
+      .h { font-size: 12.5px; font-weight: 700; fill: #1f2328; }
+      .s { font-size: 11px; fill: #57606a; }
+      .d { font-size: 10.5px; fill: #9a2f2f; }
+      .g { fill: #fff6dc; stroke: #c9a227; stroke-width: 1.5; }
+      .tray { stroke: #e3a3a3; stroke-width: 1.5; stroke-dasharray: 4 3; }
+      .dot { fill: #3f7dd6; }
+    </style>
+    <!-- drop routes: travel to a check, then fall into its tray -->
+    <path id="d1" d="M100,118 L175,118 L175,190"/>
+    <path id="d2" d="M100,118 L300,118 L300,190"/>
+    <path id="d3" d="M100,118 L425,118 L425,190"/>
+    <path id="d4" d="M100,118 L550,118 L550,190"/>
+    <path id="d5" d="M100,118 L675,118 L675,190"/>
+    <path id="ok" d="M100,118 L760,118"/>
+  </defs>
+
+  <rect width="860" height="270" rx="14" fill="#ffffff"/>
+  <text x="20" y="30" font-size="17" font-weight="700" fill="#1f2328">From scan record to ranked account</text>
+  <text x="20" y="49" class="s">Five checks. A record that fails one is dropped, never guessed. Most never become a lead.</text>
+
+  <line x1="100" y1="118" x2="755" y2="118" stroke="#c9d1d9" stroke-width="2"/>
+
+  <rect x="15" y="93" width="85" height="50" rx="9" fill="#eef1f5" stroke="#7d8a99" stroke-width="1.5"/>
+  <text x="57" y="115" class="h" text-anchor="middle">Scan</text>
+  <text x="57" y="131" class="s" text-anchor="middle">records</text>
+
+  <rect class="g" x="120" y="88" width="110" height="60" rx="9"/>
+  <text x="175" y="103" class="h" text-anchor="middle">1 Real user?</text>
+  <text x="175" y="142" class="s" text-anchor="middle">not CDN / ISP</text>
+  <rect class="g" x="245" y="88" width="110" height="60" rx="9"/>
+  <text x="300" y="103" class="h" text-anchor="middle">2 Owner proven?</text>
+  <text x="300" y="142" class="s" text-anchor="middle">cert · domain · org</text>
+  <rect class="g" x="370" y="88" width="110" height="60" rx="9"/>
+  <text x="425" y="103" class="h" text-anchor="middle">3 A problem?</text>
+  <text x="425" y="142" class="s" text-anchor="middle">rules: CVE, RDP …</text>
+  <rect class="g" x="495" y="88" width="110" height="60" rx="9"/>
+  <text x="550" y="103" class="h" text-anchor="middle">4 Real company?</text>
+  <text x="550" y="142" class="s" text-anchor="middle">AI name check</text>
+  <rect class="g" x="620" y="88" width="110" height="60" rx="9"/>
+  <text x="675" y="103" class="h" text-anchor="middle">5 Confident?</text>
+  <text x="675" y="142" class="s" text-anchor="middle">proof × evidence</text>
+
+  <rect x="755" y="93" width="90" height="50" rx="9" fill="#e2f3e8" stroke="#3f9b62" stroke-width="1.8"/>
+  <text x="800" y="115" class="h" text-anchor="middle">Ranked</text>
+  <text x="800" y="131" class="s" text-anchor="middle">to sales rep</text>
+
+  <!-- drop trays -->
+  <line class="tray" x1="140" y1="196" x2="210" y2="196"/>
+  <line class="tray" x1="265" y1="196" x2="335" y2="196"/>
+  <line class="tray" x1="390" y1="196" x2="460" y2="196"/>
+  <line class="tray" x1="515" y1="196" x2="585" y2="196"/>
+  <line class="tray" x1="640" y1="196" x2="710" y2="196"/>
+  <text x="175" y="215" class="d" text-anchor="middle">CDN, cloud landlord,</text>
+  <text x="175" y="229" class="d" text-anchor="middle">ISP, home, honeypot</text>
+  <text x="300" y="215" class="d" text-anchor="middle">no proof of owner</text>
+  <text x="425" y="215" class="d" text-anchor="middle">nothing to pitch</text>
+  <text x="550" y="215" class="d" text-anchor="middle">hoster, device maker,</text>
+  <text x="550" y="229" class="d" text-anchor="middle">placeholder name</text>
+  <text x="675" y="215" class="d" text-anchor="middle">"not enough proof"</text>
+  <text x="675" y="229" class="d" text-anchor="middle">(shown, no score)</text>
+  <text x="20" y="256" class="s">The funnel is steep on purpose: a wrong lead costs a rep more time than a missed one.</text>
+
+  <!-- moving records: many drop at check 1, few reach the end -->
+  <circle class="dot" r="5"><animateMotion dur="2.2s" begin="-0s"   repeatCount="indefinite"><mpath href="#d1"/></animateMotion></circle>
+  <circle class="dot" r="5"><animateMotion dur="2.2s" begin="-0.7s" repeatCount="indefinite"><mpath href="#d1"/></animateMotion></circle>
+  <circle class="dot" r="5"><animateMotion dur="2.2s" begin="-1.4s" repeatCount="indefinite"><mpath href="#d1"/></animateMotion></circle>
+  <circle class="dot" r="5"><animateMotion dur="3.0s" begin="-0.3s" repeatCount="indefinite"><mpath href="#d2"/></animateMotion></circle>
+  <circle class="dot" r="5"><animateMotion dur="3.0s" begin="-1.8s" repeatCount="indefinite"><mpath href="#d2"/></animateMotion></circle>
+  <circle class="dot" r="5"><animateMotion dur="3.6s" begin="-1.0s" repeatCount="indefinite"><mpath href="#d3"/></animateMotion></circle>
+  <circle class="dot" r="5"><animateMotion dur="4.2s" begin="-2.2s" repeatCount="indefinite"><mpath href="#d4"/></animateMotion></circle>
+  <circle class="dot" r="5"><animateMotion dur="4.8s" begin="-0.5s" repeatCount="indefinite"><mpath href="#d5"/></animateMotion></circle>
+  <circle r="5.5" fill="#3f9b62"><animateMotion dur="5.0s" begin="-2.6s" repeatCount="indefinite"><mpath href="#ok"/></animateMotion></circle>
+</svg>
