@@ -15,10 +15,8 @@ Outputs (the only things the app reads):
   data/out/accounts.parquet          one row per account, ranked first, by score
   data/out/account_findings.parquet  the finding rows behind every account (drill-down)
 
-Usage (from repo root):
-  python pipeline/score.py
+Run by orchestrator/process.py (python -m orchestrator score).
 """
-import argparse
 import sys
 from pathlib import Path
 
@@ -116,20 +114,3 @@ def run(src: str, out_dir: Path, con=None) -> pl.DataFrame:
             "(FORMAT parquet, COMPRESSION zstd)")
     print(acc.group_by("status").len("accounts"))
     return acc
-
-
-def main() -> None:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--in-dir", type=Path)
-    ap.add_argument("--out-dir", type=Path)
-    args = ap.parse_args()
-    paths = load_config("pipeline")["paths"]
-    in_dir = args.in_dir or ROOT / paths["findings"]
-    out_dir = args.out_dir or ROOT / paths["out"]
-    acc = run(sql_str(str(in_dir / "*.parquet")), out_dir)
-    print(acc.head(25).select("name", "main_tier", "n_ips", "score", "confidence", "reasons"))
-    print(f"-> {out_dir}/accounts.parquet, account_findings.parquet")
-
-
-if __name__ == "__main__":
-    main()

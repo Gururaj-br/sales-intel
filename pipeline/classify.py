@@ -7,12 +7,10 @@ score.py then drops finding rows whose owner is infrastructure/default.
 Guardrails: temperature 0, JSON answer checked (bad/missing -> "unknown", not cached),
 cache by hash(prompt_version, model, name), cost per run appended to logs/llm_cost.csv.
 
-Run order: findings.py -> classify.py -> score.py
-Usage (from repo root):
-  python pipeline/classify.py --dry-run     # count names + cache hits, no API call
-  python pipeline/classify.py              # key from .env (see .env.example)
+Run by the orchestrator before scoring (key from .env, see .env.example):
+  python -m orchestrator score --dry-run   # count names + cache hits, no API call
+  python -m orchestrator score             # label new names, then score
 """
-import argparse
 import csv
 import hashlib
 import json
@@ -152,14 +150,3 @@ def run(findings_src: str, dry_run: bool = False) -> pl.DataFrame | None:
     print(labels["label"].value_counts().sort("count", descending=True))
     print(f"calls {stats['calls']}, tokens {stats['tok_in']}/{stats['tok_out']}, ~${usd:.4f} -> {paths['labels'].relative_to(ROOT)}")
     return labels
-
-
-def main() -> None:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--dry-run", action="store_true", help="count names and cache hits; no API call")
-    args = ap.parse_args()
-    run(sql_str(str(ROOT / load_config("pipeline")["paths"]["findings"] / "*.parquet")), args.dry_run)
-
-
-if __name__ == "__main__":
-    main()

@@ -4,7 +4,7 @@ Rules come from config/exclusions.yaml. First matching rule wins:
   1. tag honeypot                                   -> excluded, honeypot
   2. tag cdn, CDN/WAF org name, CDN cloud service   -> excluded, cdn_waf
   3. ISP org name                                   -> excluded, isp
-  4. security vendor in org or domains (if enabled) -> excluded, security_vendor
+  4. security vendor in org or domains             -> excluded, security_vendor
   5. tag cloud, any cloud provider, hosting org     -> needs_attribution, cloud_hosting
   6. org on the unclassified list (exact name)      -> needs_attribution, unclassified_org
   7. anything else                                  -> eligible
@@ -12,20 +12,16 @@ Rows are labelled, never deleted (excluded rows feed later signals).
 
 Always recomputes every part: it takes seconds, and labels must follow config edits.
 
-Usage (from repo root):
-  python pipeline/eligibility.py                  # all parts in data/parquet/observations
-  python pipeline/eligibility.py --in-dir data/sample/test_obs --out-dir data/sample/test_elig
+Run by orchestrator/process.py, one part file at a time (python -m orchestrator ...).
 """
-import argparse
 import sys
-import time
 from pathlib import Path
 
 import pandera.polars as pa
 import polars as pl
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import ROOT, connect, load_config, match_sql, sql_str  # noqa: E402
+from common import match_sql, sql_str  # noqa: E402
 
 STATUSES = ["excluded", "needs_attribution", "eligible"]
 REASONS = ["honeypot", "cdn_waf", "isp", "security_vendor", "cloud_hosting", "unclassified_org"]
@@ -73,9 +69,7 @@ def label_sql(cfg: dict) -> str:
     honeypot = has_tag([t for t in hard["tags"] if t == "honeypot"])
     cdn_tags = has_tag([t for t in hard["tags"] if t != "honeypot"])
     edge = ", ".join(sql_str(s) for s in hard["cloud_edge_services"]) or "NULL"
-    security = (f"({match_sql('org', sec['names'])} OR {any_domain(sec['names'])})"
-                if sec["enabled"] else "FALSE")
-    cloud_provider = "cloud_provider IS NOT NULL" if soft["use_cloud_provider"] else "FALSE"
+    security = f"({match_sql('org', sec['names'])} OR {any_domain(sec['names'])})"
     return f"""
       CASE
         WHEN {honeypot} THEN ['excluded', 'honeypot']
@@ -83,7 +77,7 @@ def label_sql(cfg: dict) -> str:
              OR upper(cloud_service) IN ({edge}) THEN ['excluded', 'cdn_waf']
         WHEN {match_sql('org', hard['isp_orgs'])} THEN ['excluded', 'isp']
         WHEN {security} THEN ['excluded', 'security_vendor']
-        WHEN {has_tag(soft['tags'])} OR {cloud_provider}
+        WHEN {has_tag(soft['tags'])} OR cloud_provider IS NOT NULL
              OR {match_sql('org', soft['hosting_orgs'])} THEN ['needs_attribution', 'cloud_hosting']
         WHEN {exact_org(soft.get('unclassified_orgs', []))} THEN ['needs_attribution', 'unclassified_org']
         ELSE ['eligible', NULL]
@@ -97,41 +91,5 @@ def label_part(con, src: Path, dst: Path, cfg: dict) -> pl.DataFrame:
         FROM (SELECT *, {label_sql(cfg)} AS lbl FROM read_parquet({sql_str(str(src))}))
     """).pl()
     SCHEMA.validate(df)
-    tmp = dst.with_suffix(".parquet.tmp")
-    df.write_parquet(tmp, compression="zstd")
-    tmp.replace(dst)
+    df.write_parquet(dst, compression="zstd")
     return df.group_by("part", "status", "reason").len("rows")
-
-
-def main() -> None:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--in-dir", type=Path, help="observations folder (default from pipeline.yaml)")
-    ap.add_argument("--out-dir", type=Path, help="output folder (default from pipeline.yaml)")
-    args = ap.parse_args()
-
-    paths = load_config("pipeline")["paths"]
-    in_dir = args.in_dir or ROOT / paths["observations"]
-    out_dir = args.out_dir or ROOT / paths["eligibility"]
-    out_dir.mkdir(parents=True, exist_ok=True)
-    cfg = load_config("exclusions")
-
-    con = connect()
-    counts = []
-    for src in sorted(in_dir.glob("*.parquet")):
-        t0 = time.time()
-        counts.append(label_part(con, src, out_dir / src.name, cfg))
-        print(f"label {src.name} in {time.time() - t0:.1f}s", flush=True)
-    if not counts:
-        sys.exit(f"no parquet files in {in_dir}")
-
-    summary = (pl.concat(counts).group_by("status", "reason").agg(pl.col("rows").sum())
-               .with_columns((pl.col("rows") / pl.col("rows").sum() * 100).round(1).alias("pct"))
-               .sort("rows", descending=True))
-    print(summary)
-    log = ROOT / "logs" / "eligibility_summary.csv"
-    summary.write_csv(log)
-    print(f"summary -> {log.relative_to(ROOT)}")
-
-
-if __name__ == "__main__":
-    main()

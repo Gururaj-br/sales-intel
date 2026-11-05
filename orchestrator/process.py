@@ -96,20 +96,20 @@ def process_files(ocfg: dict, partitions: list[Partition], force: bool = False) 
 
 
 def write_summaries(rows: list[dict]) -> None:
-    """Run totals -> logs/orchestrator/ (git-ignored; never overwrites the shipped logs/*.csv)."""
-    out = ROOT / "logs" / "orchestrator"
+    """Totals of the last `process` run -> logs/ (parts, what was excluded, how owners were proven)."""
+    out = ROOT / "logs"
     out.mkdir(parents=True, exist_ok=True)
     keep = ["partition", "part", "rows_raw", "rows_rejected", "rows_no_ip", "dupes_dropped", "rows_out",
             "findings", "seconds_total"]
-    pl.DataFrame([{k: r.get(k) for k in keep} for r in rows]).sort("partition", "part").write_csv(out / "parts.csv")
+    pl.DataFrame([{k: r.get(k) for k in keep} for r in rows]).sort("partition", "part").write_csv(out / "parts_summary.csv")
     for stage, cols in [("eligibility", ["status", "reason"]), ("attribution", ["status", "tier", "attr_note"])]:
         df = pl.DataFrame([x for r in rows for x in r[stage]])
         (df.group_by(cols).agg(pl.col("rows").sum())
            .with_columns((pl.col("rows") / pl.col("rows").sum() * 100).round(1).alias("pct"))
-           .sort("rows", descending=True).write_csv(out / f"{stage}.csv"))
+           .sort("rows", descending=True).write_csv(out / f"{stage}_summary.csv"))
 
 
-def score_and_publish(ocfg: dict, llm: bool, run_dt: str | None = None) -> pl.DataFrame:
+def score_and_publish(ocfg: dict, llm: bool, run_dt: str | None = None, dry_run: bool = False) -> pl.DataFrame | None:
     """All silver findings -> optional LLM labels -> gold/dt=<run date>/ + gold/latest/ -> data/out."""
     import classify
     import score
@@ -127,8 +127,10 @@ def score_and_publish(ocfg: dict, llm: bool, run_dt: str | None = None) -> pl.Da
             for key in keys:
                 storage.get(key, tmp)
             src = sql_str(str(tmp / "silver" / "findings" / "**" / "*.parquet"))
-        if llm:
-            classify.run(src)                        # only names not in the cache cost money
+        if llm or dry_run:
+            classify.run(src, dry_run)               # only names not in the cache cost money
+        if dry_run:
+            return None
         gold = tmp / "gold"
         acc = score.run(src, gold)
         for f in ("accounts.parquet", "account_findings.parquet"):

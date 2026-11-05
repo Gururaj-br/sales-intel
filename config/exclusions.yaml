@@ -56,12 +56,10 @@ hard_exclude:
   # Residential: no residential field exists. Residential IPs sit on ISP orgs, so the
   # isp_orgs list covers them. No separate rule (keep it simple).
 
-# 1b) OPTIONAL exclude: cybersecurity vendors (they sell security; pitching them is odd).
-#     Switch on/off here. Matched against the account's org name AND its attributed
-#     domain/cert org, so an account is caught however it was attributed.
-#     When enabled: false, they are scored like anyone else.
+# 1b) Exclude cybersecurity vendors (they sell security; pitching them is odd).
+#     Matched against the org name, the domains and the cert org, so an account is caught
+#     however it was attributed. Empty list = nobody excluded for this reason.
 security_vendors:
-  enabled: true
   names:                  # seen in part-00 (Q4 org, Q5 domain, cert O)
     - palo alto networks  # org, 617 rows
     - trend micro         # domain trendmicro.com, 255 rows
@@ -77,9 +75,8 @@ security_vendors:
 # 2) SOFT exclude: clouds / big hosting. Scored ONLY if attribution tier A or B succeeds
 #    (real cert subject or real customer hostname). The org name alone is never enough.
 needs_attribution:
-  tags: [cloud]               # 117,912 rows
-  use_cloud_provider: true    # cloud.provider is non-null (Google, Amazon, Alibaba Cloud,
-                              # Tencent Cloud, DigitalOcean, Azure, Linode, Oracle Cloud...)
+  tags: [cloud]               # 117,912 rows. Also: any row whose cloud.provider is set (Google,
+                              # Amazon, Alibaba Cloud, Tencent Cloud, DigitalOcean, Azure, Linode...)
   hosting_orgs:               # hosters without the cloud tag, from Q4
     - google
     - amazon
@@ -276,25 +273,22 @@ default_cert_cns: ["support", "*", "localhost"]
 
 # 5) How attribution picks an owner (pipeline/attribute.py). Tiers: A cert O > B domain > C org.
 attribution:
-  # A cert O or B domain that names a CDN / hoster / ISP (the lists above) is never an owner:
-  # "CloudFlare, Inc." cert or "linode.com" hostname just means "hosted there".
-  reject_infra_names: true
+  # Always applied (no switches):
+  # - A cert O or B domain that names a CDN / hoster / ISP (the lists above) is never an owner:
+  #   "CloudFlare, Inc." cert or "linode.com" hostname just means "hosted there".
+  # - More than one real domain left on one IP+port (shared hosting) -> we cannot tell
+  #   which site owns the server -> no tier B (abstain > guess).
   # Reverse-DNS rule: a hostname that contains all 4 parts of its own IPv4
   # (static.152.82.88.23.clients.your-server.de) is a machine name made by a hoster/ISP.
   # part-00: 126,389 of 192,037 hostnames on scorable rows. Replaces an endless ISP domain list.
-  reverse_dns_rule: true
   # round 2: ISPs hide the IP in other ways, so a hostname is ALSO reverse-DNS when it has
   # >= 3 of the IP's numbers (compared as numbers: "090" == 90; dsl081-224-136.speakeasy.net),
   # or the IP in hex (ool-2f153e12.static.optonline.net), or one of these whole labels
   # (labels = parts between "." and "-"): customer.chcoilx1.isp.starlink.com
   reverse_dns_words: [static, dynamic, dyn, pool, pools, dsl, adsl, cable, modemcable, cpe,
                       customer, cust, dhcp, broadband, client, clients, ppp, isp, residential]
-  # More than one real domain left on one IP+port (shared hosting) -> we cannot tell
-  # which site owns the server -> no tier B (abstain > guess).
-  abstain_on_multiple_domains: true
 
-# Org string normalization (so "ServiceNow, Inc." == "SERVICENOW, INC.").
+# Org string normalization (so "ServiceNow, Inc." == "SERVICENOW, INC."): lowercase, punctuation
+# -> space, then these legal suffixes are cut from the end.
 org_normalize:
-  lowercase: true
-  strip_punctuation: true
   strip_suffixes: [inc, llc, ltd, limited, corp, corporation, co, gmbh, plc, sa, sas, ag, bv, pty, pte]

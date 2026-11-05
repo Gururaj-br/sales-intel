@@ -11,7 +11,7 @@ Scope of the numbers above: owner names from the first 500,000 records of the sc
 
 Guardrails: JSON schema validation, temperature 0, "unknown" fallback, cache by content hash, prompts versioned in `prompts/`.
 Rule: if LLM does not beat the regex baseline on the gold set, remove it and say so.
-Hosted app makes **no** LLM calls by default. Optional "Ask" chat: only if config/app.yaml chat.enabled is true.
+Hosted app makes **no** LLM calls.
 
 ## Run notes
 - 2026-11-04 v1: 772 names -> company 473 / default 132 / infrastructure 77 / unknown 90

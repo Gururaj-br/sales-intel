@@ -7,18 +7,15 @@ Rule kinds (all in findings.yaml):
   tag_rules      Shodan tag present
   module_rules   column matches a regex / is TRUE / has any of a list
 
-Usage (from repo root):
-  python pipeline/findings.py
+Run by orchestrator/process.py, one part file at a time (python -m orchestrator ...).
 """
-import argparse
 import sys
-import time
 from pathlib import Path
 
 import pandera.polars as pa
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import ROOT, connect, load_config, sql_str  # noqa: E402
+from common import sql_str  # noqa: E402
 
 KEEP = ("part, ip_str, port, transport, ts, owner_key, owner_name, tier, attr_weight, attr_agree, "
         "country, b_cand AS domain")   # country/domain/agreement: shown in the app
@@ -71,32 +68,5 @@ def findings_part(con, src: Path, dst: Path, cfg: dict):
     con.sql(f"CREATE OR REPLACE TEMP VIEW src AS SELECT * FROM read_parquet({sql_str(str(src))}) WHERE tier <> 'D'")
     df = con.sql(" UNION ALL ".join(rule_selects(cfg))).pl()
     SCHEMA.validate(df)
-    tmp = dst.with_suffix(".parquet.tmp")
-    df.write_parquet(tmp, compression="zstd")
-    tmp.replace(dst)
+    df.write_parquet(dst, compression="zstd")
     return df
-
-
-def main() -> None:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--in-dir", type=Path)
-    ap.add_argument("--out-dir", type=Path)
-    args = ap.parse_args()
-    paths = load_config("pipeline")["paths"]
-    in_dir = args.in_dir or ROOT / paths["attribution"]
-    out_dir = args.out_dir or ROOT / paths["findings"]
-    out_dir.mkdir(parents=True, exist_ok=True)
-    cfg = load_config("findings")
-    con = connect()
-    files = sorted(in_dir.glob("*.parquet"))
-    if not files:
-        sys.exit(f"no parquet files in {in_dir}")
-    for src in files:
-        t0 = time.time()
-        df = findings_part(con, src, out_dir / src.name, cfg)
-        print(f"findings {src.name}: {df.height} rows in {time.time() - t0:.1f}s", flush=True)
-        print(df.group_by("finding").len("rows").sort("rows", descending=True))
-
-
-if __name__ == "__main__":
-    main()

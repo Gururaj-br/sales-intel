@@ -3,7 +3,7 @@
   land     --input <local file> --dt D --source S [--hr H] [--file NAME]   put a file into landing/
   split    <meta>       landing file -> bronze parts
   process  <meta>       bronze parts -> silver (parallel, restartable)
-  score    [--no-llm]   all silver -> gold/dt=<today>/ + gold/latest/ -> data/out
+  score    [--no-llm] [--dry-run]   all silver -> gold/dt=<today>/ + gold/latest/ -> data/out
   run      <meta>       split + process + score
   status                what is in the lake
 
@@ -91,6 +91,7 @@ def main() -> None:
     ap.add_argument("--workers", type=int, help="override config process.workers")
     ap.add_argument("--part-size", type=int, help="override config split.records_per_part")
     ap.add_argument("--no-llm", action="store_true", help="score with existing LLM labels, no API calls")
+    ap.add_argument("--dry-run", action="store_true", help="score: only count owner names the LLM would label")
     ap.add_argument("--force", action="store_true", help="redo a split / parts that are already done")
     args = ap.parse_args()
 
@@ -108,7 +109,7 @@ def main() -> None:
     if args.command == "status":
         return status(ocfg)
     if args.command == "score":
-        score_and_publish(ocfg, llm)
+        score_and_publish(ocfg, llm, dry_run=args.dry_run)
         return
     if args.command == "land":
         if not args.input:

@@ -8,7 +8,7 @@ Tiers, best first (rules and lists in config/exclusions.yaml, weights in config/
   C  org name         ONLY for status = eligible (for clouds the org is the landlord)
   D  no owner         never scored; attr_note says why
 Excluded rows are kept with tier D (later signals use them). A tier-A owner that is a
-security vendor (switch in exclusions.yaml) also becomes D.
+security vendor (list in exclusions.yaml) also becomes D.
 
 owner_key = normalized name (A, C) or the domain (B); it is the account id downstream.
 
@@ -17,20 +17,16 @@ winning proof. Cert O == org; cert O ~ domain; domain ~ org (eligible only: for 
 is the landlord). Adds scoring.yaml agreement.bonus to attr_weight. A tier-B domain that agrees
 with the org takes the org's key, so service-now.com rows join the "servicenow" account.
 
-Usage (from repo root):
-  python pipeline/attribute.py
-  python pipeline/attribute.py --in-dir data/sample/test_elig --out-dir data/sample/test_attr
+Run by orchestrator/process.py, one part file at a time (python -m orchestrator ...).
 """
-import argparse
 import sys
-import time
 from pathlib import Path
 
 import pandera.polars as pa
 import polars as pl
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import ROOT, connect, load_config, match_sql, sql_str  # noqa: E402
+from common import match_sql, sql_str  # noqa: E402
 
 TIERS = ["A", "B", "C", "D"]
 NOTES = ["excluded", "security_vendor", "multiple_domains", "no_proof", "no_org"]
@@ -69,13 +65,10 @@ def in_list(expr: str, values: list[str]) -> str:
 
 def norm_sql(expr: str, cfg: dict) -> str:
     """SQL: 'ServiceNow, Inc.' -> 'servicenow'. Lowercase, punctuation -> space, drop end suffixes."""
-    n = cfg["org_normalize"]
-    s = f"lower({expr})" if n["lowercase"] else expr
-    if n["strip_punctuation"]:
-        s = f"regexp_replace({s}, '[^\\p{{L}}\\p{{N}}]+', ' ', 'g')"
-    if n["strip_suffixes"]:
-        suf = "|".join(n["strip_suffixes"])
-        s = f"regexp_replace(trim({s}), '(\\s+({suf}))+$', '')"
+    s = f"regexp_replace(lower({expr}), '[^\\p{{L}}\\p{{N}}]+', ' ', 'g')"
+    suffixes = cfg["org_normalize"]["strip_suffixes"]
+    if suffixes:
+        s = f"regexp_replace(trim({s}), '(\\s+({'|'.join(suffixes)}))+$', '')"
     return f"nullif(trim({s}), '')"
 
 
@@ -84,22 +77,17 @@ def attribute_sql(cfg: dict) -> str:
     hard, soft, sec, rules = cfg["hard_exclude"], cfg["needs_attribution"], cfg["security_vendors"], cfg["attribution"]
     infra_terms = hard["cdn_waf_orgs"] + hard["isp_orgs"] + soft["hosting_orgs"]
 
-    def infra_name(col: str) -> str:
-        return match_sql(col, infra_terms) if rules["reject_infra_names"] else "FALSE"
+    def infra_name(col: str) -> str:          # a CDN / hoster / ISP name is never an owner
+        return match_sql(col, infra_terms)
 
     infra_domains = ", ".join(sql_str(d) for d in cfg["infra_domains"]) or "NULL"
-    if rules["reverse_dns_rule"]:
-        words = ", ".join(sql_str(w.lower()) for w in rules.get("reverse_dns_words", [])) or "NULL"
-        reverse_dns = (
-            "(len(list_filter(ip_nums, lambda o: list_contains(list_transform("
-            "regexp_extract_all(h, '\\d+'), lambda x: TRY_CAST(x AS INTEGER)), o))) >= 3"
-            " OR (ip_hex IS NOT NULL AND contains(lower(h), ip_hex))"
-            f" OR list_has_any(string_split_regex(lower(h), '[.-]'), [{words}]))")
-    else:
-        reverse_dns = "FALSE"
-    security = match_sql("a_owner", sec["names"]) if sec["enabled"] else "FALSE"
-    many = ("['D', NULL, 'multiple_domains']" if rules["abstain_on_multiple_domains"]
-            else "['B', list_sort(b_cands)[1], NULL]")
+    words = ", ".join(sql_str(w.lower()) for w in rules.get("reverse_dns_words", [])) or "NULL"
+    reverse_dns = (   # hostname made by a hoster/ISP from the IP: >= 3 IP numbers, IP in hex, or an ISP word
+        "(len(list_filter(ip_nums, lambda o: list_contains(list_transform("
+        "regexp_extract_all(h, '\\d+'), lambda x: TRY_CAST(x AS INTEGER)), o))) >= 3"
+        " OR (ip_hex IS NOT NULL AND contains(lower(h), ip_hex))"
+        f" OR list_has_any(string_split_regex(lower(h), '[.-]'), [{words}]))")
+    security = match_sql("a_owner", sec["names"])
 
     return f"""
     WITH ip AS (   -- the IPv4 as 4 numbers and as hex, for the reverse-DNS rule
@@ -135,7 +123,7 @@ def attribute_sql(cfg: dict) -> str:
         WHEN len(b_cands) = 1                           THEN ['B', lower(b_cands[1]), NULL]
         WHEN status = 'eligible' AND {norm_sql('org', cfg)} IS NOT NULL THEN ['C', trim(org), NULL]
         WHEN status = 'eligible' AND len(b_cands) = 0   THEN ['D', NULL, 'no_org']
-        WHEN len(b_cands) > 1                           THEN {many}
+        WHEN len(b_cands) > 1                           THEN ['D', NULL, 'multiple_domains']  -- shared hosting: abstain
         ELSE ['D', NULL, 'no_proof']
       END AS lbl FROM c)
     """
@@ -193,43 +181,5 @@ def attribute_part(con, src: Path, dst: Path, cfg: dict, weights: dict) -> pl.Da
         pl.when(bad).then(False).otherwise(pl.col("attr_agree")).alias("attr_agree"),
     )
     SCHEMA.validate(df)
-    tmp = dst.with_suffix(".parquet.tmp")
-    df.write_parquet(tmp, compression="zstd")
-    tmp.replace(dst)
+    df.write_parquet(dst, compression="zstd")
     return df.group_by("status", "tier", "attr_note").len("rows")
-
-
-def main() -> None:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--in-dir", type=Path, help="eligibility folder (default from pipeline.yaml)")
-    ap.add_argument("--out-dir", type=Path, help="output folder (default from pipeline.yaml)")
-    args = ap.parse_args()
-
-    paths = load_config("pipeline")["paths"]
-    in_dir = args.in_dir or ROOT / paths["eligibility"]
-    out_dir = args.out_dir or ROOT / paths["attribution"]
-    out_dir.mkdir(parents=True, exist_ok=True)
-    cfg = load_config("exclusions")
-    weights = load_config("scoring")["attribution_weight"]
-
-    con = connect()
-    counts = []
-    for src in sorted(in_dir.glob("*.parquet")):
-        t0 = time.time()
-        counts.append(attribute_part(con, src, out_dir / src.name, cfg, weights))
-        print(f"attribute {src.name} in {time.time() - t0:.1f}s", flush=True)
-    if not counts:
-        sys.exit(f"no parquet files in {in_dir}")
-
-    summary = (pl.concat(counts).group_by("status", "tier", "attr_note").agg(pl.col("rows").sum())
-               .with_columns((pl.col("rows") / pl.col("rows").sum() * 100).round(1).alias("pct"))
-               .sort("status", "tier", "attr_note"))
-    with pl.Config(tbl_rows=50):
-        print(summary)
-    log = ROOT / "logs" / "attribution_summary.csv"
-    summary.write_csv(log)
-    print(f"summary -> {log.relative_to(ROOT)}")
-
-
-if __name__ == "__main__":
-    main()

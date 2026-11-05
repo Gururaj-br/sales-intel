@@ -1,5 +1,4 @@
 """eligibility.py rules on tiny hand-made rows (test fixtures, not real data)."""
-import copy
 import sys
 from pathlib import Path
 
@@ -56,11 +55,3 @@ def test_rules(tmp_path, cfg, name):
     got = run(tmp_path, cfg)
     *_, status, reason = CASES[name]
     assert got[name] == (status, reason)
-
-
-def test_security_switch_off(tmp_path, cfg):
-    off = copy.deepcopy(cfg)
-    off["security_vendors"]["enabled"] = False
-    got = run(tmp_path, off)
-    assert got["security_vendor_org"] == ("eligible", None)
-    assert got["security_vendor_domain"] == ("eligible", None)

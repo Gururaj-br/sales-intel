@@ -1,5 +1,4 @@
 """attribute.py rules on tiny hand-made rows (test fixtures, not real data)."""
-import copy
 import sys
 from pathlib import Path
 
@@ -103,10 +102,3 @@ def test_agreement(tmp_path, cfg, name):
 def test_agreed_domain_takes_org_name(tmp_path, cfg):
     got = run(tmp_path, cfg)["agree_domain_org"]
     assert (got["owner_name"], got["b_cand"]) == ("ServiceNow, Inc.", "service-now.com")
-
-
-def test_multiple_domains_switch_off(tmp_path, cfg):
-    off = copy.deepcopy(cfg)
-    off["attribution"]["abstain_on_multiple_domains"] = False
-    got = run(tmp_path, off)["b_multiple"]
-    assert (got["tier"], got["owner_key"]) == ("B", "one.com")

@@ -145,6 +145,11 @@ Below the root the paths are identical. Folders are Hive-style (`name=value`), s
 It builds every path from these. Pass them as flags, as a JSON file (`--meta`), or use `--pending` to pick up every landed file
 that is not fully processed yet.
 
+**Raw data is kept twice on purpose:** `landing/` holds the file as delivered and `bronze/` holds the same records as parts,
+copied byte-for-byte. Silver keeps only the fields today's rules use; anything else (raw banner, JARM, certificate hashes…)
+stays in bronze and can be added to silver later by rerunning `process --force`. In production on S3, a lifecycle rule
+can move `landing/` to cheap archive storage after N days; `_split.json` keeps the size and sha256 that tie the parts to it.
+
 **Reruns:** `split` is skipped when `_split.json` exists, `process` skips parts with a done marker, and `score` always
 rebuilds gold (seconds; the LLM is only called for owner names not in the cache).
 
@@ -163,13 +168,13 @@ python eval/eval_orgs.py        # quality check against the gold set
 streamlit run app/app.py        # the app (reads data/out only)
 pytest -q                       # tests
 ```
-Each stage can also be run on its own (`python pipeline/<stage>.py`) for development.
+`python -m orchestrator score --dry-run` shows how many owner names the LLM step would label (and pay for) before running it.
 
 ## Repository map
 | Path | What |
 |---|---|
 | `orchestrator/` | split / process / score / run, local or S3 ([usage](orchestrator/README.md)) |
-| `pipeline/` | one file per stage: `ingest`, `eligibility`, `attribute`, `findings`, `classify` (LLM), `score` |
+| `pipeline/` | one file per stage (`ingest`, `eligibility`, `attribute`, `findings`, `classify` (LLM), `score`); each handles one part file and is called by the orchestrator |
 | `config/` | every rule and setting: exclusions, findings, scoring, LLM, app text, orchestrator |
 | `app/app.py` | Streamlit app (reads `data/out` only) |
 | `eval/` | gold set and evaluation script |

@@ -79,11 +79,17 @@ python -m orchestrator run --pending --storage s3    # the same against the S3 b
 python -m orchestrator split   --dt 2026-11-01 --source shodan --file sample_assignment.json.zst
 python -m orchestrator process --dt 2026-11-01 --source shodan --file sample_assignment.json.zst --workers 3
 python -m orchestrator score            # everything in silver; --no-llm = reuse cached labels only
+python -m orchestrator score --dry-run  # only count the owner names the LLM would label (no API call)
 python -m orchestrator status           # landed files, parts done, gold present
 
 # smaller parts for a quick look
 python -m orchestrator split --dt 2026-11-01 --source shodan --file demo.json.zst --part-size 100000
 ```
+
+## Raw data is kept twice
+`landing/` keeps the file as delivered; `bronze/` keeps the same records as parts, copied byte-for-byte. Silver keeps only the
+fields the rules use, so nothing is lost: to use another field later, add it to `pipeline/ingest.py` and rerun `process --force`.
+On S3, a lifecycle rule can move `landing/` to archive storage after N days (`_split.json` keeps size + sha256).
 
 ## Reruns
 | Step | On a rerun |
@@ -103,7 +109,7 @@ python -m orchestrator split --dt 2026-11-01 --source shodan --file demo.json.zs
 | `llm_step` | label new owner names with the LLM before scoring (cached; needs `GROQ_API_KEY`; CLI `--no-llm`) |
 | `publish_to` | where gold/latest is copied for the app (`data/out`) |
 
-Run summaries go to `logs/orchestrator/` (git-ignored).
+Totals of the last `process` run go to `logs/` (`parts_summary.csv`, `eligibility_summary.csv`, `attribution_summary.csv`).
 
 ## What has been tested
 - End to end on local storage (`tests/test_orchestrator.py`): a 2,000-record file made of two zstd frames is landed,

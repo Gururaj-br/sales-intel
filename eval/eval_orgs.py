@@ -6,7 +6,7 @@ Gold: eval/gold_orgs.csv (names behind the baseline top-60 accounts + 40 random;
   2. Ranking: of the top 25 ranked accounts, how many are gold "company"? rules vs rules+LLM.
 Rule (docs/LLM_USAGE.md): if the LLM does not beat the baseline, remove it and say so.
 
-Usage (from repo root, after classify.py):  python eval/eval_orgs.py
+Usage (from repo root, after `python -m orchestrator run ...` on local storage):  python eval/eval_orgs.py
 """
 import sys
 from pathlib import Path
@@ -61,7 +61,8 @@ def main() -> None:
     print("   companies the LLM would drop:", q["wrongly_dropped_companies"])
 
     con, cfg = connect(), load_config("scoring")
-    src = sql_str(str(ROOT / load_config("pipeline")["paths"]["findings"] / "*.parquet"))
+    lake = load_config("orchestrator")["local"]["root"]       # all findings, incl. LLM-dropped owners
+    src = sql_str(str(ROOT / lake / "silver" / "findings" / "**" / "*.parquet"))
     dropped = labels.filter(pl.col("label").is_in(drop))["name"].to_list()
     base, withllm = top_precision(score(con, src, cfg), gold), top_precision(score(con, src, cfg, dropped), gold)
     print(f"\n2) top-{TOP} ranked accounts by gold label")
