@@ -24,7 +24,7 @@ import pandera.polars as pa
 import polars as pl
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import ROOT, connect, load_config, sql_str  # noqa: E402
+from common import ROOT, connect, load_config, sql_str, top_sql  # noqa: E402
 
 SCHEMA = pa.DataFrameSchema(
     {
@@ -62,8 +62,8 @@ def score_sql(src: str, cfg: dict, drop_names: list[str] | None = None) -> str:
     ), contrib AS (
       SELECT *, sev * log2(n + 1) * pow(0.5, age_days / {half}) AS points FROM per_type
     ), acc AS (        -- account-level numbers from the raw finding rows
-      SELECT owner_key, mode(owner_name) AS name, mode(tier) AS main_tier,
-             mode(country) AS country, mode(domain) AS domain,
+      SELECT owner_key, {top_sql('owner_name')} AS name, {top_sql('tier')} AS main_tier,
+             {top_sql('country')} AS country, {top_sql('domain')} AS domain,   -- ties: alphabetical
              avg(attr_weight) AS attr_conf, avg(evidence) AS evidence,
              count(DISTINCT ip_str) AS n_ips, count(*) AS n_findings, max(ts) AS last_seen
       FROM f GROUP BY 1
@@ -72,8 +72,8 @@ def score_sql(src: str, cfg: dict, drop_names: list[str] | None = None) -> str:
            sum(points) AS score,
            acc.attr_conf * acc.evidence AS confidence,
            list(finding || ' on ' || contrib.n_ips || ' IP' || CASE WHEN contrib.n_ips > 1 THEN 's' ELSE '' END
-                || ' (sev ' || round(sev, 1) || ')' ORDER BY points DESC)[1:{top}] AS reasons,
-           list(pitch ORDER BY points DESC)[1] AS pitch
+                || ' (sev ' || round(sev, 1) || ')' ORDER BY points DESC, finding)[1:{top}] AS reasons,
+           list(pitch ORDER BY points DESC, finding)[1] AS pitch
     FROM contrib JOIN acc USING (owner_key)
     GROUP BY ALL
     """

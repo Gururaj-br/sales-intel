@@ -23,7 +23,7 @@ from pathlib import Path
 import polars as pl
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import ROOT, connect, load_config, load_env, sql_str  # noqa: E402
+from common import ROOT, connect, load_config, load_env, sql_str, top_sql  # noqa: E402
 from score import score  # noqa: E402
 
 SOURCE = {"A": "cert", "B": "org", "C": "org"}   # tier-B owner_name is the org when it agreed
@@ -46,7 +46,7 @@ def candidates(con, findings_src: str) -> pl.DataFrame:
     ranked = acc.filter(pl.col("status") == "ranked").select("owner_key")
     con.register("ranked", ranked)
     return con.sql(f"""
-        SELECT owner_name AS name, mode(tier) AS tier
+        SELECT owner_name AS name, {top_sql('tier')} AS tier
         FROM read_parquet({findings_src}) JOIN ranked USING (owner_key)
         WHERE owner_name IS NOT NULL GROUP BY 1 ORDER BY 1
     """).pl().with_columns(pl.col("tier").replace_strict(SOURCE).alias("source")).drop("tier")

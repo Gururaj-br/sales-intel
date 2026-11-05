@@ -70,6 +70,15 @@ def load_env(path: Path = ROOT / ".env") -> None:
         os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
+def top_sql(column: str) -> str:
+    """SQL aggregate: the most frequent non-NULL value; a tie goes to the alphabetically first.
+
+    Unlike DuckDB's mode(), the answer never changes between runs.
+    """
+    return (f"list_sort(list_transform(map_entries(histogram({column})), "
+            f"lambda e: {{'c': -(e.value::BIGINT), 'k': e.key}}))[1].k")
+
+
 def sql_str(s: str) -> str:
     """Quote a Python string as a SQL literal."""
     return "'" + s.replace("'", "''") + "'"

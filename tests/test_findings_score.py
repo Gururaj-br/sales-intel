@@ -104,3 +104,16 @@ def test_repeat_sighting_in_another_chunk_counts_once(tmp_path):
     assert acc["n_findings"] == 1                      # not 2
     assert acc["last_seen"] == T0                      # latest sighting wins
     assert acc["score"] == pytest.approx(9 * 1.0)      # sev 9 * log2(1+1) * recency 1
+
+
+def test_ties_are_broken_the_same_way_every_run(tmp_path):
+    """Two name spellings / countries seen equally often: alphabetically first wins, every time."""
+    rows = [{**BASE, "owner_key": "acme", "ip_str": ip, "port": 3389, "owner_name": name, "country": cc}
+            for ip, name, cc in [("10.0.3.1", "Acme Ltd.", "TH"), ("10.0.3.2", "Acme Ltd", "JP")]]
+    src, dst = tmp_path / "a.parquet", tmp_path / "f.parquet"
+    pl.DataFrame(rows, schema_overrides={"tags": pl.List(pl.Utf8), "cve_ids": pl.List(pl.Utf8),
+                                         "ssl_versions": pl.List(pl.Utf8)}).write_parquet(src)
+    findings_part(connect(), src, dst, load_config("findings"))
+    for _ in range(5):
+        acc = score(connect(), sql_str(str(dst)), load_config("scoring")).row(0, named=True)
+        assert (acc["name"], acc["country"]) == ("Acme Ltd", "JP")
