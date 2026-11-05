@@ -1,2 +1,2 @@
 partition,part,rows_raw,rows_rejected,rows_no_ip,dupes_dropped,rows_out,findings,seconds_total
-dt=2026-11-01/source=shodan/file=scan_first_500k,0,500000,0,19,36490,463491,15262,20.6
+dt=2026-11-01/source=shodan/file=scan_first_500k,0,500000,0,19,36490,463491,15262,19.6

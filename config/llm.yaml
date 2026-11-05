@@ -8,7 +8,9 @@ model: openai/gpt-oss-120b     # VERIFY on console.groq.com/docs/models before t
 temperature: 0
 batch_size: 40                     # names per call
 max_retries: 4                     # waits 5/10/20/40 s (rate limits), then "unknown" (not cached)
-max_wait_s: 60                     # cap on one wait
+max_wait_s: 60                     # cap on one wait (a 429's retry-after is used when it is given)
+tokens_per_minute: 8000            # Groq free-tier limit for this model (from its 429 message); calls are
+                                   # paced to stay under it. Upgrade the plan -> raise this; null = no pacing
 prompt_file: prompts/org_classify_v2.md   # v2: maker names in certs = default (v1 kept for comparison)
 prompt_version: v2                 # part of the cache key: change the prompt -> bump this
 

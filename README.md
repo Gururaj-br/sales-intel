@@ -61,7 +61,8 @@ Recency halves every 30 days. The same IP + port seen again in a later scan coun
 
 Guardrails on the LLM step (`pipeline/classify.py`): fixed JSON answer format checked against the allowed labels,
 temperature 0, answers cached by `hash(prompt version, model, name)`, missing or invalid answers fall back to `unknown`
-(and are retried next run), cost logged per run (`logs/llm_cost.csv`), accuracy measured on a separately labelled gold set.
+(and are retried next run), cost logged per run (`logs/llm_cost.csv`), calls paced to stay under the provider's tokens-per-minute limit
+(a 429 is retried after the time the API asks for), accuracy measured on a separately labelled gold set.
 The prompt examples are checked to contain no gold-set names. Details and costs: [docs/LLM_USAGE.md](docs/LLM_USAGE.md).
 
 ## Results

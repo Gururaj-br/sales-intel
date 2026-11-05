@@ -5,10 +5,11 @@ from pathlib import Path
 from types import SimpleNamespace as NS
 
 import polars as pl
+import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "pipeline"))
-from classify import classify, log_cost, parse  # noqa: E402
+from classify import Pacer, classify, log_cost, parse, retry_wait  # noqa: E402
 from common import load_config  # noqa: E402
 
 LABELS = ["company", "infrastructure", "default", "unknown"]
@@ -85,3 +86,36 @@ def test_cost_logged(tmp_path):
                    tmp_path / "cost.csv")
     assert usd == cfg["price_usd_per_mtok"]["input"]
     assert (tmp_path / "cost.csv").read_text().count("\n") == 2   # header + 1 run
+
+
+def test_pacer_keeps_tokens_per_minute_under_limit():
+    """Real numbers: ~3,600 tokens per call, 8,000 per minute -> 2 calls fit, the 3rd waits."""
+    now, slept = [0.0], []
+    pacer = Pacer(8000, clock=lambda: now[0], sleep=lambda s: (slept.append(s), now.__setitem__(0, now[0] + s)))
+    sent = []
+    for _ in range(6):
+        pacer.wait()
+        sent.append(now[0])
+        pacer.record(3600)
+        now[0] += 1                                   # each call takes 1 s
+    assert slept[0] == pytest.approx(58.1)            # call 3 waits until call 1 leaves the 60 s window
+    assert len(slept) == 2                            # call 4 doesn't (call 2 left meanwhile); call 5 does
+    # no 60-second window ever holds more than 8,000 tokens
+    assert all(sum(3600 for u in sent if s <= u < s + 60) <= 8000 for s in sent)
+
+
+def test_pacer_without_limit_never_waits():
+    pacer = Pacer(None, sleep=lambda s: pytest.fail("should not sleep"))
+    for _ in range(5):
+        pacer.wait()
+        pacer.record(100_000)
+
+
+def test_retry_wait_uses_retry_after_header():
+    cfg = {"max_wait_s": 60}
+    limited = Exception("429")
+    limited.response = NS(headers={"retry-after": "2.325"})
+    assert retry_wait(limited, 0, cfg) == pytest.approx(2.825)          # what the API asked + 0.5 s
+    assert retry_wait(Exception("network"), 2, cfg) == 20                # no header: 5, 10, 20 ...
+    limited.response = NS(headers={"retry-after": "600"})
+    assert retry_wait(limited, 0, cfg) == 60                             # capped

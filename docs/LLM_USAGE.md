@@ -13,6 +13,12 @@ Guardrails: JSON schema validation, temperature 0, "unknown" fallback, cache by 
 Rule: if LLM does not beat the regex baseline on the gold set, remove it and say so.
 Hosted app makes **no** LLM calls.
 
+Rate limit: the Groq free tier allows 8,000 tokens per minute for this model and one call of 40 names uses
+about 3,600 tokens (about 1,500 in, 2,100 out, mostly the model's reasoning), so about 2 calls fit in a minute.
+`classify.py` paces calls to stay under `tokens_per_minute` (config/llm.yaml) and, if a 429 still comes back,
+waits as long as its retry-after header says. A full run of 772 new names takes about 10 minutes; cached names cost nothing.
+All keys of one Groq organization share that limit, so rotating keys does not help.
+
 ## Run notes
 - 2026-11-04 v1: 772 names -> company 473 / default 132 / infrastructure 77 / unknown 90
   (40 of the 90 = one batch whose answer failed the JSON check; not cached, retried next run).

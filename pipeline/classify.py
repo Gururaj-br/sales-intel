@@ -6,6 +6,8 @@ score.py then drops finding rows whose owner is infrastructure/default.
 
 Guardrails: temperature 0, JSON answer checked (bad/missing -> "unknown", not cached),
 cache by hash(prompt_version, model, name), cost per run appended to logs/llm_cost.csv.
+Rate limit: calls are paced to stay under tokens_per_minute (config/llm.yaml); if the API still
+answers 429, we wait as long as its retry-after header says.
 
 Run by the orchestrator before scoring (key from .env, see .env.example):
   python -m orchestrator score --dry-run   # count names + cache hits, no API call
@@ -17,6 +19,7 @@ import json
 import os
 import sys
 import time
+from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -65,21 +68,61 @@ def parse(text: str, n: int, labels: list[str]) -> dict[int, dict]:
     return out
 
 
-def ask(client, cfg: dict, prompt: str, batch: list[dict]) -> tuple[dict, int, int]:
+class Pacer:
+    """Keeps the tokens sent in any 60-second window under the API's per-minute limit.
+
+    Before a call it assumes the call will cost what the previous one did; if that would go over
+    the limit, it sleeps until enough old calls drop out of the window. No limit = no waiting.
+    """
+    def __init__(self, tokens_per_minute: int | None, clock=time.monotonic, sleep=time.sleep):
+        self.tpm, self.clock, self.sleep = tokens_per_minute, clock, sleep
+        self.window, self.est, self.waited = deque(), 0, 0.0      # (time, tokens) of recent calls
+
+    def wait(self) -> None:
+        while self.tpm:
+            now = self.clock()
+            while self.window and now - self.window[0][0] >= 60:
+                self.window.popleft()
+            if not self.window or sum(t for _, t in self.window) + self.est <= self.tpm:
+                return
+            pause = self.window[0][0] + 60 - now + 0.1
+            self.waited += pause
+            self.sleep(pause)
+
+    def record(self, tokens: int) -> None:
+        self.window.append((self.clock(), tokens))
+        self.est = tokens
+
+
+def retry_wait(error: Exception, attempt: int, cfg: dict) -> float:
+    """Seconds to wait after a failed call: what a 429's retry-after header says, else 5, 10, 20, 40."""
+    headers = getattr(getattr(error, "response", None), "headers", None) or {}
+    try:
+        wait = float(headers.get("retry-after")) + 0.5
+    except (TypeError, ValueError):
+        wait = 5 * 2 ** attempt
+    return min(cfg.get("max_wait_s", 60), wait)
+
+
+def ask(client, cfg: dict, prompt: str, batch: list[dict], pacer: Pacer | None = None) -> tuple[dict, int, int]:
     """One API call for one batch. Returns (parsed answers, tokens in, tokens out)."""
     items = [{"id": i, "name": b["name"], "source": b["source"]} for i, b in enumerate(batch)]
     for attempt in range(cfg["max_retries"] + 1):
         try:
+            if pacer:
+                pacer.wait()
             resp = client.chat.completions.create(
                 model=cfg["model"], temperature=cfg["temperature"],
                 response_format={"type": "json_object"},
                 messages=[{"role": "system", "content": prompt},
                           {"role": "user", "content": json.dumps({"names": items}, ensure_ascii=False)}])
             got = parse(resp.choices[0].message.content, len(batch), cfg["labels"])
+            if pacer:
+                pacer.record(resp.usage.prompt_tokens + resp.usage.completion_tokens)
             return got, resp.usage.prompt_tokens, resp.usage.completion_tokens
         except Exception as e:  # network / rate limit: retry, then give up -> unknown
-            wait = min(cfg.get("max_wait_s", 60), 5 * 2 ** attempt)   # 5, 10, 20, 40 s: rides out rate limits
-            print(f"  call failed ({type(e).__name__}: {str(e)[:120]}); attempt {attempt + 1}, waiting {wait}s",
+            wait = retry_wait(e, attempt, cfg)
+            print(f"  call failed ({type(e).__name__}: {str(e)[:120]}); attempt {attempt + 1}, waiting {wait:.1f}s",
                   flush=True)
             if attempt < cfg["max_retries"]:
                 time.sleep(wait)
@@ -91,12 +134,13 @@ def classify(names: pl.DataFrame, cfg: dict, client, cache_path: Path) -> tuple[
     cache = load_cache(cache_path)
     todo = [r for r in names.iter_rows(named=True) if cache_key(cfg, r["name"]) not in cache]
     stats = {"names": names.height, "cache_hits": names.height - len(todo), "calls": 0, "tok_in": 0, "tok_out": 0}
+    pacer = Pacer(cfg.get("tokens_per_minute"))
     prompt = (ROOT / cfg["prompt_file"]).read_text()
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     with open(cache_path, "a") as f:
         for i in range(0, len(todo), cfg["batch_size"]):
             batch = todo[i:i + cfg["batch_size"]]
-            got, t_in, t_out = ask(client, cfg, prompt, batch)
+            got, t_in, t_out = ask(client, cfg, prompt, batch, pacer)
             stats["calls"] += 1
             stats["tok_in"] += t_in
             stats["tok_out"] += t_out
@@ -106,6 +150,8 @@ def classify(names: pl.DataFrame, cfg: dict, client, cache_path: Path) -> tuple[
                     cache[row["key"]] = row
                     f.write(json.dumps(row, ensure_ascii=False) + "\n")
             print(f"  batch {i // cfg['batch_size'] + 1}: {len(got)}/{len(batch)} valid", flush=True)
+    if pacer.waited:
+        print(f"  paced {pacer.waited:.0f}s in total to stay under {pacer.tpm:,} tokens/minute")
     out = [{"name": r["name"], "source": r["source"],
             **{k: cache.get(cache_key(cfg, r["name"]), {}).get(k) for k in ("label", "reason")}}
            for r in names.iter_rows(named=True)]
