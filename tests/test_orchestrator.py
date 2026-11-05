@@ -1,4 +1,4 @@
-"""Orchestrator: split -> process -> score on local storage, and the S3 backend on a fake client."""
+"""Orchestrator: layout + meta checks, S3 backend on a fake client, and land -> split -> process -> score locally."""
 import io
 import json
 import sys
@@ -9,9 +9,11 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from orchestrator.storage import S3Storage, bronze_key, chunks_of, silver_key  # noqa: E402
+from orchestrator.storage import (S3Storage, bronze_key, done_key, gold_key, landing_key,  # noqa: E402
+                                  make_partition, partition_from_landing_key, parts_of, silver_key, split_key)
 
 SAMPLE = ROOT / "data/sample/s2k.jsonl"     # 2,000 real records (git-ignored)
+P = make_partition({"dt": "2026-11-01", "source": "shodan", "file": "sample_assignment.json.zst"}, use_hour=False)
 
 
 class FakeS3:
@@ -43,60 +45,85 @@ class FakeS3:
         self.objects[(Bucket, Key)] = Body
 
 
+def test_layout_keys():
+    assert landing_key(P) == "landing/dt=2026-11-01/source=shodan/sample_assignment.json.zst"
+    assert bronze_key(P, 26) == "bronze/dt=2026-11-01/source=shodan/file=sample_assignment/part-00026.json.zst"
+    assert silver_key("findings", P, 0) == "silver/findings/dt=2026-11-01/source=shodan/file=sample_assignment/part-00000.parquet"
+    assert split_key(P) == "manifest/dt=2026-11-01/source=shodan/file=sample_assignment/_split.json"
+    assert done_key(P, 3) == "manifest/dt=2026-11-01/source=shodan/file=sample_assignment/part-00003.done.json"
+    assert gold_key("accounts.parquet", "2026-11-05") == "gold/dt=2026-11-05/accounts.parquet"
+    assert gold_key("accounts.parquet") == "gold/latest/accounts.parquet"
+    ph = make_partition({"dt": "2026-11-01", "source": "Shodan", "file": "x.json.zst", "hr": "7"}, use_hour=True)
+    assert landing_key(ph) == "landing/dt=2026-11-01/source=shodan/hr=07/x.json.zst"     # lowercased, padded
+    assert partition_from_landing_key(landing_key(ph)) == ph
+
+
+def test_meta_is_checked():
+    with pytest.raises(ValueError):                       # bad date
+        make_partition({"dt": "2026-13-01", "source": "shodan", "file": "a"}, False)
+    with pytest.raises(ValueError):                       # hour given but hours are off: mixed depths
+        make_partition({"dt": "2026-11-01", "source": "shodan", "file": "a", "hr": "01"}, False)
+    with pytest.raises(ValueError):                       # hours on but no hour
+        make_partition({"dt": "2026-11-01", "source": "shodan", "file": "a"}, True)
+    with pytest.raises(ValueError):                       # missing source
+        make_partition({"dt": "2026-11-01", "file": "a"}, False)
+
+
 def test_s3_storage_round_trip(tmp_path):
-    st = S3Storage("bkt", "lake", client=FakeS3())
+    st = S3Storage("bkt", "", client=FakeS3())            # bucket root, same keys as local
     f = tmp_path / "x.parquet"
     f.write_bytes(b"data")
-    st.put(f, silver_key("findings", "src1", 3))
-    st.write_json("bronze/source=src1/_meta.json", {"chunks": 1})
-    assert st.exists("silver/findings/source=src1/chunk=00003/src1_c00003.parquet")
-    assert not st.exists("silver/findings/source=src1/chunk=00004/src1_c00004.parquet")
-    assert st.list("silver/", ".parquet") == ["silver/findings/source=src1/chunk=00003/src1_c00003.parquet"]
-    assert st.get(silver_key("findings", "src1", 3), tmp_path / "dl").read_bytes() == b"data"
-    assert st.read_json("bronze/source=src1/_meta.json") == {"chunks": 1}
-    assert st.uri == "s3://bkt/lake"
-
-
-def test_hive_layout():
-    assert bronze_key("scan_a", 7) == "bronze/source=scan_a/chunk=00007/scan_a_c00007.json.zst"
-    assert silver_key("eligibility", "scan_a", 7) == "silver/eligibility/source=scan_a/chunk=00007/scan_a_c00007.parquet"
+    st.put(f, silver_key("findings", P, 3))
+    st.write_json(split_key(P), {"parts": 1})
+    assert st.exists(silver_key("findings", P, 3)) and not st.exists(silver_key("findings", P, 4))
+    assert st.list("silver/", ".parquet") == [silver_key("findings", P, 3)]
+    assert st.get(silver_key("findings", P, 3), tmp_path / "dl").read_bytes() == b"data"
+    assert (tmp_path / "dl" / silver_key("findings", P, 3)).exists()     # full key path kept: no name clashes
+    assert st.read_json(split_key(P)) == {"parts": 1}
+    assert st.uri == "s3://bkt" and S3Storage("bkt", "lake", client=FakeS3()).uri == "s3://bkt/lake"
 
 
 @pytest.mark.skipif(not SAMPLE.exists(), reason="needs data/sample/s2k.jsonl")
-def test_split_process_score_local(tmp_path, monkeypatch):
+def test_land_split_process_score_local(tmp_path, monkeypatch):
     zstd = pytest.importorskip("zstandard")
-    from orchestrator.process import process_sources, score_and_publish
+    from orchestrator.process import process_files, score_and_publish
     from orchestrator.split import split_file
     from orchestrator.storage import LocalStorage
 
-    # input = two zstd frames back to back (like `cat a.zst b.zst`): must read as one stream
+    # landed file = two zstd frames back to back (like `cat a.zst b.zst`): must read as one stream
     lines = SAMPLE.read_bytes().splitlines(keepends=True)
-    big = tmp_path / "big.json.zst"
-    big.write_bytes(zstd.ZstdCompressor().compress(b"".join(lines[:1200]))
+    src = tmp_path / "sample_assignment.json.zst"
+    src.write_bytes(zstd.ZstdCompressor().compress(b"".join(lines[:1200]))
                     + zstd.ZstdCompressor().compress(b"".join(lines[1200:])))
 
-    ocfg = {"storage": "local", "local": {"root": str(tmp_path / "lake")},
-            "split": {"records_per_chunk": 700, "zstd_level": 3},
+    ocfg = {"storage": "local", "local": {"root": str(tmp_path / "lake")}, "layout": {"use_hour": False},
+            "split": {"records_per_part": 700, "zstd_level": 3},
             "process": {"workers": 1, "duckdb_memory_per_worker": "1GB", "duckdb_threads_per_worker": 2,
                         "work_dir": str(tmp_path / "work")},
             "llm_step": False, "publish_to": str(tmp_path / "out")}
     monkeypatch.setattr("orchestrator.process.write_summaries", lambda rows: None)   # keep logs/ untouched
     st = LocalStorage(ocfg["local"]["root"])
+    st.put(src, landing_key(P))                                        # = `land`
 
-    meta = split_file(st, str(big), "t1", 700, work_dir=tmp_path)
-    assert meta["records"] == 2000 and meta["chunks"] == 3          # 700 + 700 + 600
-    assert list(chunks_of(st, "t1")) == [0, 1, 2]
-    with zstd.ZstdDecompressor().stream_reader(open(st.root / bronze_key("t1", 2), "rb")) as r:
+    meta = split_file(st, P, 700, work_dir=tmp_path / "work")
+    assert meta["records"] == 2000 and meta["parts"] == 3              # 700 + 700 + 600
+    assert meta["bytes"] == src.stat().st_size and len(meta["sha256"]) == 64
+    assert list(parts_of(st, P)) == [0, 1, 2]
+    with zstd.ZstdDecompressor().stream_reader(open(st.root / bronze_key(P, 2), "rb")) as r:
         assert r.read().count(b"\n") == 600                            # records copied, not changed
+    assert (st.root / landing_key(P)).read_bytes() == src.read_bytes()  # landing untouched
 
-    rows = process_sources(ocfg, ["t1"])
-    assert sorted(r["chunk"] for r in rows) == [0, 1, 2]
+    rows = process_files(ocfg, [P])
+    assert sorted(r["part"] for r in rows) == [0, 1, 2]
     assert sum(r["rows_raw"] for r in rows) == 2000
     for stage in ("observations", "eligibility", "attribution", "findings"):
-        assert (st.root / silver_key(stage, "t1", 1)).exists()
-    assert all(r.get("skipped") for r in process_sources(ocfg, ["t1"]))   # rerun skips done chunks
+        assert (st.root / silver_key(stage, P, 1)).exists()
+    obs = pl.read_parquet(st.root / silver_key("observations", P, 1))
+    assert obs["part"].unique().to_list() == ["2026-11-01_shodan_sample_assignment_part-00001"]   # unique id
+    assert all(r.get("skipped") for r in process_files(ocfg, [P]))      # rerun skips done parts
 
-    acc = score_and_publish(ocfg, llm=False)
-    assert (tmp_path / "out" / "accounts.parquet").exists() and (st.root / "gold/accounts.parquet").exists()
+    acc = score_and_publish(ocfg, llm=False, run_dt="2026-11-05")
+    for key in ("gold/dt=2026-11-05/accounts.parquet", "gold/latest/accounts.parquet"):
+        assert (st.root / key).exists()
     assert acc.height == pl.read_parquet(tmp_path / "out" / "accounts.parquet").height
-    assert json.loads((st.root / "bronze/source=t1/_meta.json").read_text())["chunks"] == 3
+    assert json.loads((st.root / split_key(P)).read_text())["parts"] == 3

@@ -42,7 +42,7 @@ SCHEMA = pa.DataFrameSchema(
 def kept_sql(src: str, drop_names: list[str] | None = None) -> str:
     """Finding rows minus owners the LLM labelled infrastructure/default.
 
-    The same IP + port is scanned again in other chunks / files: keep only its LATEST sighting
+    The same IP + port is scanned again in other parts / files: keep only its LATEST sighting
     per finding, so a repeat scan does not count as a second problem.
     """
     drop = (f"WHERE owner_name NOT IN ({', '.join(sql_str(n) for n in drop_names)})" if drop_names else "")

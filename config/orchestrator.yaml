@@ -1,29 +1,40 @@
 # orchestrator.yaml: WHERE the data lake lives and HOW MUCH to run at once (orchestrator/).
 # Business rules stay in the other config files; this one is only plumbing.
+#
+# Layout (identical under the local root and the S3 bucket):
+#   landing/dt=<date>/source=<src>[/hr=<HH>]/<file>                      original file, never changed
+#   bronze/dt=…/source=…[/hr=…]/file=<file id>/part-00000.json.zst       split parts
+#   silver/<stage>/dt=…/source=…[/hr=…]/file=<file id>/part-00000.parquet
+#   manifest/dt=…/source=…[/hr=…]/file=<file id>/_split.json, part-00000.done.json
+#   gold/dt=<run date>/…  and  gold/latest/…
 
 storage: local                 # local | s3   (CLI: --storage s3)
 
 local:
-  root: data/lake              # git-ignored folder; same layout as on S3
+  root: data/lake              # git-ignored folder
 
 s3:                            # used when storage: s3
-  bucket: my-sales-intel-bucket   # CHANGE: an existing bucket in your AWS account
-  prefix: lake                 # everything goes under s3://<bucket>/<prefix>/
+  bucket: my-sales-intel-bucket   # CHANGE: an existing bucket in your AWS account (it is the root)
+  prefix: ""                   # optional sub-folder inside the bucket, e.g. "lake"; "" = bucket root
   region: ap-south-1           # CHANGE: the bucket's region
   profile: null                # AWS profile from ~/.aws/credentials; null = default chain
                                # (AWS_PROFILE / AWS_ACCESS_KEY_ID env vars / IAM role)
 
+layout:
+  use_hour: false              # true = every path has hr=<HH> and every file must come with an hour.
+                               # One switch for the whole lake: mixed depths would break Hive readers.
+
 split:
-  records_per_chunk: 500000    # ~0.75 GB compressed per chunk; one chunk = one unit of work
-  zstd_level: 3                # chunk compression (3 = fast, good ratio)
+  records_per_part: 500000     # ~0.75 GB compressed per part; one part = one unit of work
+  zstd_level: 3                # part compression (3 = fast, good ratio)
 
 process:
-  workers: 2                   # chunks processed at the same time (each is a separate process)
+  workers: 2                   # parts processed at the same time (each is a separate process)
   duckdb_memory_per_worker: 4GB   # workers x memory must fit in RAM (laptop: 16 GB -> 2 x 4 GB)
   duckdb_threads_per_worker: 3
-  work_dir: data/work          # local scratch for workers (cleaned after each chunk)
+  work_dir: data/work          # local scratch for workers (cleaned after each part)
 
 llm_step: true                 # label new owner names with the LLM before scoring (needs GROQ_API_KEY);
                                # cached, so only never-seen names cost money. CLI: --no-llm
 
-publish_to: data/out           # copy gold here: the hosted app reads only this folder
+publish_to: data/out           # copy gold/latest here: the hosted app reads only this folder

@@ -6,7 +6,7 @@ Built from Shodan-style internet scan data for the sales team of a cybersecurity
 **Live app:** https://sales-intel-wgbpzzn9khttipxii3r6rq.streamlit.app/ (no login, no API keys, no AI calls at view time)
 
 > **Scope of this proof of concept.** The input is one scan file of 13.5 million records (18 GB compressed).
-> The app and every number below come from its **first 500,000 records** (one of 27 equal chunks).
+> The app and every number below come from its **first 500,000 records** (one of its 27 parts).
 > The [orchestrator](orchestrator/README.md) that splits and processes the whole file, locally or on S3, is built and
 > tested end-to-end on a small sample and against a fake S3 client; it has not yet been run on the full file or on real AWS.
 
@@ -92,23 +92,71 @@ The gold labels were drafted with AI help and **have not yet been reviewed by a 
 Full method and history: [docs/EVALUATION.md](docs/EVALUATION.md).
 
 ## Scale: hundreds to thousands of files a month
-The input is one large file (millions of records). The [orchestrator](orchestrator/README.md) treats every file the same way:
-- **split** streams it into 500k-record chunks in Hive-style folders (`bronze/source=<id>/chunk=<n>/`), never fully unpacked;
-- **process** runs ingest → exclude → find owner → find problems on each chunk in parallel workers; each chunk is independent and restartable;
-- **score** reads the small findings of all files, removes repeat sightings, and publishes the two files the app reads.
+The input is one large file (13.5M records, 18 GB compressed), and many such files arrive every month.
+The [orchestrator](orchestrator/README.md) treats every file the same way:
+- **land**: the file arrives in the landing ("master") folder for its date and source, and is never changed there;
+- **split**: streams it into part files of 500,000 records (27 parts for this file), never fully unpacked;
+- **process**: runs ingest → exclude → find owner → find problems on every part in parallel workers; each part is independent and restartable;
+- **score**: reads the small findings of all files, removes repeat sightings, and publishes the two files the app reads.
 
-The same code runs on a laptop folder or on **S3** (one line in `config/orchestrator.yaml`, plus a normal AWS login).
-In production an S3 upload event or a daily schedule starts `split`, several containers run `process`, and `score` runs once a day.
-Volume only affects split and process, which scale by adding workers. LLM cost grows only with **new** owner names, because answers are cached.
-No Spark or Airflow needed: one 500,000-record chunk was processed within a 4 GB DuckDB memory cap (ingest took 12.6 s).
+The same code runs on a laptop folder or on **S3**: one line in `config/orchestrator.yaml`, plus a normal AWS login.
+In production an S3 upload event or a daily cron calls `run --pending`; several containers can run `process` side by side,
+and `score` runs once a day. Volume only affects split and process, which scale by adding workers.
+LLM cost grows only with **new** owner names, because answers are cached.
+No Spark or Airflow needed: one 500,000-record part was processed within a 4 GB DuckDB memory cap (ingest took 12.6 s).
+
+## Storage layout (the same on a laptop and on S3)
+One root holds everything: `data/lake/` locally, or the S3 bucket (`s3://<bucket>/`, optionally under a prefix).
+Below the root the paths are identical. Folders are Hive-style (`name=value`), so DuckDB, Athena or Spark read
+`dt`, `source` and `file` as columns and only open the folders a query needs.
+
+```
+<root>/                                     local: data/lake      S3: s3://<bucket>
+├── landing/                                the "master" folder: original files arrive here, never changed
+│   └── dt=2026-11-01/source=shodan/
+│       └── sample_assignment.json.zst      18 GB, 13.5M records
+├── bronze/                                 the file split into parts
+│   └── dt=2026-11-01/source=shodan/file=sample_assignment/
+│       ├── part-00000.json.zst             500,000 records each
+│       └── … part-00026.json.zst           (27 parts)
+├── silver/<stage>/                         clean tables, one Parquet per part per stage
+│   └── dt=2026-11-01/source=shodan/file=sample_assignment/part-00000.parquet …
+│         observations  one row per IP + port
+│         eligibility   + excluded / needs proof / eligible
+│         attribution   + owner, and how it was proven
+│         findings      one row per IP + port + problem
+├── manifest/                               bookkeeping, same partitions
+│   └── dt=2026-11-01/source=shodan/file=sample_assignment/
+│       ├── _split.json                     size, sha256, records, parts, time of the split
+│       └── part-00000.done.json …          part finished + row counts (reruns skip it)
+└── gold/                                   what the app reads
+    ├── dt=2026-11-05/                      snapshot for each scoring day
+    └── latest/                             accounts.parquet, account_findings.parquet → copied to data/out
+```
+
+| Partition | Meaning | Why |
+|---|---|---|
+| `dt=YYYY-MM-DD` | date the file belongs to | daily processing and clean-up by day; `dt` (not `date`) because `date` is a reserved word in Athena/Hive SQL |
+| `source=<name>` | data provider / feed, lowercase | several feeds can share one lake |
+| `hr=HH` | hour (optional) | off by default. `layout.use_hour` switches it on **for the whole lake**: mixed depths would break Hive readers |
+| `file=<file id>` | landed file name without extension | several files per source per day must not overwrite each other's parts |
+
+**Meta details** the orchestrator needs for each file: `dt`, `source`, `file` (plus `hr` when hours are on).
+It builds every path from these. Pass them as flags, as a JSON file (`--meta`), or use `--pending` to pick up every landed file
+that is not fully processed yet.
+
+**Reruns:** `split` is skipped when `_split.json` exists, `process` skips parts with a done marker, and `score` always
+rebuilds gold (seconds; the LLM is only called for owner names not in the cache).
 
 ## Run it
 ```bash
 pip install -r requirements.txt
 cp .env.example .env            # optional: GROQ_API_KEY for the LLM step
 
-# whole pipeline on one big file (local folder; add --storage s3 for S3)
-python -m orchestrator run --input /path/to/scan.json.zst --source scan_2026_11_01
+# put the file into landing, then split + process + score (local folder; add --storage s3 for S3)
+python -m orchestrator land --input /path/to/sample_assignment.json.zst --dt 2026-11-01 --source shodan
+python -m orchestrator run  --dt 2026-11-01 --source shodan --file sample_assignment.json.zst
+python -m orchestrator run  --pending           # or: everything landed and not finished yet
 python -m orchestrator status
 
 python eval/eval_orgs.py        # quality check against the gold set

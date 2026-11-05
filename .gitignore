@@ -15,3 +15,4 @@ data/lake/
 data/work/
 data/input/
 logs/full_run.log
+logs/orchestrator/

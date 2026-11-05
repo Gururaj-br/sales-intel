@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 270" width="860" height="270" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
-  <title>Data flow: one big scan file, split into chunks, processed in parallel, scored, served</title>
+  <title>Data flow: one big scan file, split into parts, processed in parallel, scored, served</title>
   <defs>
     <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
       <path d="M0,0 L10,5 L0,10 z" fill="#8b949e"/>
@@ -20,7 +20,7 @@
 
   <rect width="860" height="270" rx="14" fill="#ffffff"/>
   <text x="20" y="30" font-size="17" font-weight="700" fill="#1f2328">Data flow</text>
-  <text x="20" y="49" class="s">One big file in. Chunks are processed in parallel, so more files only need more workers.</text>
+  <text x="20" y="49" class="s">One big file lands. Its parts are processed in parallel, so more files only need more workers.</text>
 
   <!-- nodes -->
   <rect x="20"  y="98" width="98" height="60" rx="9" fill="#fbf3ea" stroke="#b07a45" stroke-width="1.5"/>
@@ -29,7 +29,7 @@
 
   <rect x="164" y="98" width="98" height="60" rx="9" fill="#fbf3ea" stroke="#b07a45" stroke-width="1.5"/>
   <text x="213" y="116" class="h" text-anchor="middle">Split</text>
-  <text x="213" y="148" class="s" text-anchor="middle">into chunks</text>
+  <text x="213" y="148" class="s" text-anchor="middle">into parts</text>
 
   <rect x="318" y="68" width="202" height="120" rx="9" fill="#f1f4f7" stroke="#7d8a99" stroke-width="1.5"/>
   <text x="419" y="84" class="h" text-anchor="middle" font-size="12.5">Process (parallel workers)</text>
@@ -55,14 +55,14 @@
 
   <!-- layer bars -->
   <rect x="20"  y="204" width="242" height="18" rx="5" fill="#b07a45"/>
-  <text x="141" y="217" class="layer" text-anchor="middle">BRONZE · raw chunks</text>
+  <text x="141" y="217" class="layer" text-anchor="middle">LANDING + BRONZE</text>
   <rect x="318" y="204" width="202" height="18" rx="5" fill="#7d8a99"/>
   <text x="419" y="217" class="layer" text-anchor="middle">SILVER · clean tables</text>
   <rect x="576" y="204" width="110" height="18" rx="5" fill="#c9a227"/>
   <text x="631" y="217" class="layer" text-anchor="middle">GOLD</text>
   <rect x="742" y="204" width="98" height="18" rx="5" fill="#3f9b62"/>
   <text x="791" y="217" class="layer" text-anchor="middle">SERVE</text>
-  <text x="20" y="250" class="s">Same folder layout on a laptop and on S3: bronze/source=…/chunk=…/ · silver/&lt;stage&gt;/source=…/chunk=…/ · gold/</text>
+  <text x="20" y="250" class="s">Same layout on a laptop and in an S3 bucket: landing/ · bronze/ · silver/&lt;stage&gt;/ … dt=…/source=…/file=…/part-NNNNN · gold/</text>
 
   <!-- moving packets: colour follows the layer they are in -->
   <g>
