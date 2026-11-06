@@ -1,5 +1,5 @@
 """Sales intel app: rankings come ONLY from data/out/*.parquet (precomputed, no LLM at view time).
-Optional "Ask" tab (config/ask.yaml): an LLM answers rep questions from those rows; key from Streamlit secrets / .env.
+Optional "Ask AI" tab (config/ask.yaml): an LLM answers rep questions from those rows; key from Streamlit secrets / .env.
 
 Confidence is computed here, live, from the evidence rows of each account:
   confidence = mean owner-proof weight of its finding rows * mean evidence strength of its findings
@@ -18,7 +18,7 @@ OUT = ROOT / "data" / "out"
 SCORING = yaml.safe_load((ROOT / "config" / "scoring.yaml").read_text())
 
 EXPLAIN = yaml.safe_load((ROOT / "config" / "explain.yaml").read_text())   # plain-language text
-ASK = yaml.safe_load((ROOT / "config" / "ask.yaml").read_text())           # optional Ask tab, off by default
+ASK = yaml.safe_load((ROOT / "config" / "ask.yaml").read_text())           # optional Ask AI tab
 
 
 def word(bands: list[dict], value: float) -> str:
@@ -74,7 +74,7 @@ if not show_abstain:
 # or the account dropdown sees new options and resets to the first one)
 view = view.sort(["ranked", "score", "owner_key"], descending=[True, True, False])
 
-tabs = st.tabs(["Accounts", "How this works"] + (["Ask"] if ASK["enabled"] else []))
+tabs = st.tabs(["Accounts", "How this works"] + (["✨ Ask AI"] if ASK["enabled"] else []))
 tab_list, tab_about = tabs[0], tabs[1]
 
 # ---------------- ranked list ----------------
@@ -178,7 +178,7 @@ which company owns each server. This demo uses the first 500,000 records of a 13
 4. **Clean up names with AI (done once, offline).** An AI model reads each owner name and flags ones that are
    not a real customer, e.g. a hosting company or a device maker whose name is printed on certificates of
    devices it sold. It is checked against a gold set of 110 names. The ranking itself uses no AI at view time;
-   only the optional Ask tab calls an AI model, to answer questions from these same accounts.
+   only the optional Ask AI tab calls an AI model, to answer questions from these same accounts.
 5. **Rank.** Each problem type adds points: how bad it is (0-10) x how many servers have it (more servers
    add points, but less each time) x how recent it is.
 
@@ -208,20 +208,29 @@ if ASK["enabled"]:
     with tabs[2]:
         key = ask.api_key(ASK)
         if not key:
-            st.info(f"Ask is on but no API key is set: add {' or '.join(ASK['api_key_env'])} "
+            st.info(f"Ask AI is on but no API key is set: add {' or '.join(ASK['api_key_env'])} "
                     "to Streamlit secrets (hosted) or .env (local).")
         else:
             @st.cache_data(show_spinner=False)
             def cached_ask(question: str) -> dict:          # same question again = no new API call
                 return ask.ask(question, acc, fnd, ASK, ask.make_client(key))
 
-            st.caption("Answers come from an AI model, using only the accounts in this app. "
-                       f"The rows it used are shown under the answer. Up to {ASK['max_questions_per_session']} "
-                       "questions per session.")
-            question = st.text_input("Ask about the accounts",
-                                     placeholder="e.g. Which companies in Brazil have open remote desktop?", key="ask_q")
             asked = st.session_state.setdefault("ask_asked", set())   # distinct questions this session
             limit = ASK["max_questions_per_session"]
+            st.markdown("#### Ask AI about these accounts")
+            st.caption(f"Powered by an AI model ({ASK['model']}). It looks up the accounts in this app and answers "
+                       "only from those rows, which are shown under the answer so you can check it.")
+            note = st.empty()                  # filled at the end, so "left" counts this question too
+
+            def use_example(q: str) -> None:
+                st.session_state["ask_q"] = q
+
+            st.markdown("**Try one of these:**")
+            cols = st.columns(2)
+            for i, q in enumerate(ASK["examples"]):
+                cols[i % 2].button(q, key=f"ask_ex_{i}", on_click=use_example, args=(q,), width="stretch")
+            question = st.text_input("Your question",
+                                     placeholder="e.g. Which companies in Brazil have open remote desktop?", key="ask_q")
             if question.strip() and question.strip() not in asked and len(asked) >= limit:
                 st.warning(f"You have used all {limit} questions for this session. Reload the page to start a new one.")
             elif question.strip():
@@ -230,7 +239,11 @@ if ASK["enabled"]:
                     try:
                         res = cached_ask(question.strip())
                     except Exception as e:                # network / rate limit / bad key
-                        st.error(f"The AI call failed: {type(e).__name__}: {str(e)[:200]}")
+                        asked.discard(question.strip())   # a failed call does not use up a question
+                        if "RateLimit" in type(e).__name__:
+                            st.warning("The free-tier rate limit is reached. Please wait a minute and ask again.")
+                        else:
+                            st.error(f"The AI call failed: {type(e).__name__}: {str(e)[:200]}")
                         res = None
                 if res:
                     st.markdown(res["answer"])
@@ -239,3 +252,6 @@ if ASK["enabled"]:
                             st.dataframe(res["rows"], hide_index=True, width="stretch")
                             if res.get("details") is not None:
                                 st.dataframe(res["details"], hide_index=True, width="stretch")
+            note.info(f"This demo runs on a **free-tier API key** with a small rate limit. Please ask a few real "
+                      f"questions and don't flood it: {limit} new questions per session "
+                      f"({max(limit - len(asked), 0)} left). If it says the limit is reached, wait a minute and try again.")

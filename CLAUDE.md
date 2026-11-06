@@ -6,7 +6,7 @@ Project rules for the AI coding assistant used to build this repo.
 - Never score CDN/WAF vendors, clouds without attribution, ISPs, residential.
 - Prefer abstain to guess. Confidence must be computed, never constant.
 - Keep it simple: DuckDB + Polars + pandera + Streamlit. No Spark/Airflow.
-- Hosted app ranks from precomputed output only. The one exception is the optional Ask tab (config/ask.yaml):
+- Hosted app ranks from precomputed output only. The one exception is the optional Ask AI tab (config/ask.yaml):
   LLM answers from fixed lookups, key only in Streamlit secrets / .env (never in the repo), questions capped per session.
 - Every LLM step: JSON schema, temp 0, cache, unknown fallback, gold-set check, cost logged.
 - Every change must report an eval delta; do not weaken tests to pass.

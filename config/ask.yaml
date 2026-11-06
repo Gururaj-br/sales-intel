@@ -10,6 +10,14 @@
 
 enabled: true
 
+examples:                     # buttons in the Ask AI tab; clicking one fills in the question
+  - What should I pitch to SERVICO FEDERAL DE PROCESSAMENTO DE DADOS?
+  - Top 5 accounts in Brazil
+  - Which companies have remote desktop open to the internet?
+  - Tell me about Heimer Automatizacion
+  - Which problem is most common across our accounts?
+  - How many ranked accounts are there per country?
+
 max_questions_per_session: 10   # public link: caps what one browser session can spend (repeats are free)
 
 api_key_env: [GROQ_ASK_API_KEY, GROQ_API_KEY]   # first one that is set wins: a separate key for chat,

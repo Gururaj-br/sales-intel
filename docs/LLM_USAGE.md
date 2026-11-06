@@ -4,7 +4,7 @@
 |---|---|---|---|---|---|---|---|
 | Org classification (prompt v1) | Groq openai/gpt-oss-120b | owner name of would-be-ranked account | 20 (40 names/call) | 25,350 / 38,356 | ~$0.06 per 1k names (VERIFY price) | 0% first run | drop precision 0.97, recall 0.70, exact 0.83 on 96 gold names (provisional) |
 | Org classification (prompt v2, KEPT) | Groq openai/gpt-oss-120b | owner name of would-be-ranked account | 20 (40 names/call) | 29,450 / 42,150 | ~$0.07 per 1k names (VERIFY price) | 0% (new prompt version) | drop precision 0.94, recall 0.77, exact 0.87 on 96 gold names (provisional; 0.85 before the 6 retried names) |
-| Ask tab (optional, config switch; answer prompt v2) | Groq openai/gpt-oss-120b | one rep question | 2 per question (tool choice + answer) | not measured yet | VERIFY | cached per question while the app runs | tool choice on 10 gold questions: not run yet (`eval/eval_ask.py`) |
+| Ask AI tab (optional, config switch; answer prompt v2) | Groq openai/gpt-oss-120b | one rep question | 2 per question (tool choice + answer) | not measured yet | VERIFY | cached per question while the app runs | tool choice on 10 gold questions: not run yet (`eval/eval_ask.py`) |
 | Gold pre-labeling | Claude (in the coding session) | gold name | n/a | n/a | n/a | n/a | drafts only; human review pending |
 
 Planned and **not built**: LLM drafting of finding rules for rare modules, LLM help on ambiguous ownership.
@@ -12,7 +12,7 @@ Scope of the numbers above: owner names from the first 500,000 records of the sc
 
 Guardrails: JSON schema validation, temperature 0, "unknown" fallback, cache by content hash, prompts versioned in `prompts/`.
 Rule: if LLM does not beat the regex baseline on the gold set, remove it and say so.
-Hosted app: rankings use no LLM at view time. The optional Ask tab does (2 calls per question), with the key in
+Hosted app: rankings use no LLM at view time. The optional Ask AI tab does (2 calls per question), with the key in
 Streamlit secrets and at most 10 new questions per browser session.
 
 Rate limit: the Groq free tier allows 8,000 tokens per minute for this model and one call of 40 names uses
