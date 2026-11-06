@@ -1,0 +1,25 @@
+# ask.yaml: optional "Ask" box in the app, where a sales rep types a question and an LLM answers it.
+# OFF by default. The hosted app never calls an LLM (CLAUDE.md), so turn it on only on your own machine.
+#
+# How an answer is made (app/ask.py), 2 LLM calls per question:
+#   1. the model picks ONE of the fixed tools below and its arguments (JSON, checked)
+#   2. the tool runs on data/out (our own code, no SQL from the model)
+#   3. the model writes the answer from those rows only
+# Answers are cached per question for as long as the app runs.
+
+enabled: true
+
+api_key_env: [GROQ_ASK_API_KEY, GROQ_API_KEY]   # first one that is set wins: a separate key for chat,
+                                                # else the pipeline's key (from the shell or .env)
+model: openai/gpt-oss-120b
+temperature: 0
+max_rows: 25                  # most rows a tool returns (and the model sees)
+
+prompt_version: v1
+tool_prompt: prompts/ask_tool_v1.md
+answer_prompt: prompts/ask_answer_v1.md
+
+cost_log: logs/ask_cost.csv
+price_usd_per_mtok:           # same model as config/llm.yaml; VERIFY on groq.com/pricing
+  input: 0.59
+  output: 0.79

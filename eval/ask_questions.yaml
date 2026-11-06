@@ -1,0 +1,32 @@
+# Gold questions for the Ask box: the tool and arguments a correct answer must use.
+# eval/eval_ask.py sends each question to the model (real API calls, ~2 per question) and scores the tool choice.
+- q: Which companies should I call first?
+  tool: top_accounts
+  args: {}
+- q: Top 5 accounts in Brazil
+  tool: top_accounts
+  args: {country: BR, n: 5}
+- q: Who has remote desktop open to the internet?
+  tool: top_accounts
+  args: {finding: rdp}
+- q: Which US companies run software that is out of support?
+  tool: top_accounts
+  args: {country: US, finding: eol_product}
+- q: Tell me about Heimer
+  tool: find_account
+  args: {name: heimer}
+- q: Is northwestern.edu on the list?
+  tool: find_account
+  args: {name: northwestern}
+- q: How many accounts do we have per country?
+  tool: count_by
+  args: {field: country}
+- q: Which problem is most common across our accounts?
+  tool: count_by
+  args: {field: finding}
+- q: What's the weather in London?
+  tool: none
+  args: {}
+- q: Write me a poem about firewalls
+  tool: none
+  args: {}

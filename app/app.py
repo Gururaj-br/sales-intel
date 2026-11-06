@@ -1,4 +1,5 @@
 """Sales intel app: reads ONLY data/out/*.parquet (precomputed). No LLM calls, no API keys.
+(Exception, off by default: the "Ask" tab in config/ask.yaml, for local use with your own key.)
 
 Confidence is computed here, live, from the evidence rows of each account:
   confidence = mean owner-proof weight of its finding rows * mean evidence strength of its findings
@@ -17,6 +18,7 @@ OUT = ROOT / "data" / "out"
 SCORING = yaml.safe_load((ROOT / "config" / "scoring.yaml").read_text())
 
 EXPLAIN = yaml.safe_load((ROOT / "config" / "explain.yaml").read_text())   # plain-language text
+ASK = yaml.safe_load((ROOT / "config" / "ask.yaml").read_text())           # optional Ask tab, off by default
 
 
 def word(bands: list[dict], value: float) -> str:
@@ -72,7 +74,8 @@ if not show_abstain:
 # or the account dropdown sees new options and resets to the first one)
 view = view.sort(["ranked", "score", "owner_key"], descending=[True, True, False])
 
-tab_list, tab_about = st.tabs(["Accounts", "How this works"])
+tabs = st.tabs(["Accounts", "How this works"] + (["Ask"] if ASK["enabled"] else []))
+tab_list, tab_about = tabs[0], tabs[1]
 
 # ---------------- ranked list ----------------
 with tab_list:
@@ -194,3 +197,35 @@ judged on a gold set of 96 names from this data. Known misses: some software mak
 The gold labels were drafted with AI help and have not yet been reviewed by a person, so treat these numbers as early.
 Details: docs/EVALUATION.md.
 """)
+
+# ---------------- ask (optional, config/ask.yaml) ----------------
+if ASK["enabled"]:
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import ask
+
+    with tabs[2]:
+        key = ask.api_key(ASK)
+        if not key:
+            st.info(f"Ask is on but no API key is set: put {' or '.join(ASK['api_key_env'])} in .env.")
+        else:
+            @st.cache_data(show_spinner=False)
+            def cached_ask(question: str) -> dict:          # same question again = no new API call
+                return ask.ask(question, acc, fnd, ASK, ask.make_client(key))
+
+            st.caption("Answers come from an AI model, using only the accounts in this app. "
+                       "The rows it used are shown under the answer.")
+            question = st.text_input("Ask about the accounts",
+                                     placeholder="e.g. Which companies in Brazil have open remote desktop?", key="ask_q")
+            if question.strip():
+                with st.spinner("Thinking..."):
+                    try:
+                        res = cached_ask(question.strip())
+                    except Exception as e:                # network / rate limit / bad key
+                        st.error(f"The AI call failed: {type(e).__name__}: {str(e)[:200]}")
+                        res = None
+                if res:
+                    st.markdown(res["answer"])
+                    if res["rows"] is not None:
+                        with st.expander(f"Data used: {res['tool']} {res['args']} ({res['rows'].height} rows)"):
+                            st.dataframe(res["rows"], hide_index=True, width="stretch")
