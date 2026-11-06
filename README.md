@@ -205,4 +205,4 @@ Two calls per question, cached while the app runs, cost logged to `logs/ask_cost
 - **No contact data.** Contact enrichment is out of scope; the app gives the company, domain, country and evidence.
 - **Some device makers still slip through** the LLM check (e.g. software vendors whose names appear on their customers' default certificates).
 
-More: [docs/DECISIONS.md](docs/DECISIONS.md) · [docs/SIGNALS.md](docs/SIGNALS.md) · [docs/DATA_PROFILE.md](docs/DATA_PROFILE.md) · [docs/EVALUATION.md](docs/EVALUATION.md)
+More: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/DECISIONS.md](docs/DECISIONS.md) · [docs/SIGNALS.md](docs/SIGNALS.md) · [docs/DATA_PROFILE.md](docs/DATA_PROFILE.md) · [docs/EVALUATION.md](docs/EVALUATION.md)

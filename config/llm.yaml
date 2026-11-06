@@ -4,7 +4,7 @@
 # fallback, gold-set check (eval/eval_orgs.py), cost logged (logs/llm_cost.csv).
 
 provider: groq
-model: openai/gpt-oss-120b     # VERIFY on console.groq.com/docs/models before the first real run
+model: openai/gpt-oss-120b     # Groq model id (console.groq.com/docs/models)
 temperature: 0
 batch_size: 40                     # names per call
 max_retries: 4                     # waits 5/10/20/40 s (rate limits), then "unknown" (not cached)

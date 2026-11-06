@@ -49,8 +49,8 @@ mdns, pptp, coap, handpunch, mcp, microsoft_exchange
 - `mongodb`: 11 rows, all authentication=true -> unauth-Mongo rule has no hits.
 - Real companies appear as `org` with isp = Google/Cloudflare (ServiceNow, Walmart, Palo Alto Networks, Fiserv, Egnyte, HubSpot).
 
-## After ingest (data/parquet/observations/part-00.parquet, 2026-11-04)
-- 500,000 raw -> 0 rejected -> 19 without ip/port -> 36,490 duplicates (7.3%, same ip+port+transport) -> **463,491 rows**, 24 MB, 12.6 s.
+## After ingest (snapshot from 2026-11-04; today the same rows are in silver/observations of the lake)
+- 500,000 raw -> 0 rejected -> 19 without ip/port -> 36,490 duplicates (7.3%, same ip+port+transport) -> **463,491 rows**, 24 MB, 12.6 s (13 MB since unused fields stay in bronze, D6).
 - 323,217 distinct IPs, of which 4,466 rows are IPv6 (Shodan puts them in `ipv6`, not `ip_str`).
 - Timestamps span only **~1 hour** (2026-11-01 00:10 -> 01:08). Recency decay is meaningless inside one part.
 - After dedupe: cve rows 10,387 (5,739 with a known-exploited CVE), cert 37,412 (cert O 11,982), exchange 26.
