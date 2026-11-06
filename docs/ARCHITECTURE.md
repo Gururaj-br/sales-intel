@@ -10,7 +10,7 @@ scan file (.json.zst) lands in landing/dt=<date>/source=<src>/   (local folder o
  -> classify      pipeline/classify.py       LLM label per owner name (offline, cached): company / infrastructure / default / unknown
  -> score         pipeline/score.py          one row per account: score, confidence, reasons, pitch; abstain below 0.5
  -> serve         app/app.py                 Streamlit, reads data/out only
- (optional) ask   app/ask.py                 Ask tab, off by default: LLM picks a fixed lookup, answers from its rows (local only)
+ (optional) ask   app/ask.py                 Ask tab (config switch): LLM picks a fixed lookup, answers from its rows
 ```
 Steps ingest to findings run per part (independent, in parallel, restartable: `orchestrator/process.py`).
 Classify and score run once over all findings.

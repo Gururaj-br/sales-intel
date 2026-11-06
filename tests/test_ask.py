@@ -49,8 +49,11 @@ def cfg(tmp_path):
     return c
 
 
-def test_off_by_default():
-    assert yaml.safe_load((ROOT / "config/ask.yaml").read_text())["enabled"] is False
+def test_config_is_safe_for_a_public_link():
+    c = yaml.safe_load((ROOT / "config/ask.yaml").read_text())
+    assert 0 < c["max_questions_per_session"] <= 20                   # caps what one visitor can spend
+    assert all(k.isupper() and not k.startswith("gsk_") for k in c["api_key_env"])   # env var NAMES, never a key
+    assert "groq" in (ROOT / "app/requirements.txt").read_text()       # hosted app can import the SDK
 
 
 def test_top_accounts_only_ranked_and_filters():

@@ -1,5 +1,6 @@
 # Hosted app only (Streamlit Community Cloud reads this file next to app.py).
-# It reads data/out/*.parquet + config/scoring.yaml; no LLM SDK, no keys.
+# It reads data/out/*.parquet + config/*.yaml. groq is only for the optional Ask tab (key in Streamlit secrets).
 streamlit==1.66.1
+groq==1.7.0
 polars==2.1.0
 pyyaml==6.0.3

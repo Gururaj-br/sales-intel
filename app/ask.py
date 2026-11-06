@@ -1,4 +1,4 @@
-"""ask.py: the optional "Ask" box (config/ask.yaml, off by default; local only, never in the hosted app).
+"""ask.py: the optional "Ask" box (config/ask.yaml; key from Streamlit secrets / env / .env, never in the repo).
 
 One question -> 2 LLM calls:
   1. the model picks ONE fixed tool + arguments (JSON, checked here; anything else -> "none")
@@ -10,7 +10,6 @@ Ranked = the stored gold status (confidence >= scoring.yaml abstain_below), not 
 import csv
 import json
 import os
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -82,11 +81,18 @@ def pick_tool(text: str, findings: list[str]) -> tuple[str, dict]:
 
 # ---------------- LLM ----------------
 def api_key(cfg: dict) -> str | None:
-    """First env var in cfg['api_key_env'] that is set (shell first, then .env)."""
-    sys.path.insert(0, str(ROOT / "pipeline"))
-    from common import load_env
-    load_env()
-    return next((os.environ[k] for k in cfg["api_key_env"] if os.environ.get(k)), None)
+    """First env var in cfg['api_key_env'] that is set: shell first, then .env.
+
+    Reads .env itself (not pipeline/common.py, which needs duckdb: the hosted app does not install it).
+    """
+    env = ROOT / ".env"
+    dotenv = dict(line.split("=", 1) for line in env.read_text().splitlines()
+                  if "=" in line and not line.strip().startswith("#")) if env.exists() else {}
+    for k in cfg["api_key_env"]:
+        value = os.environ.get(k) or dotenv.get(k, "").strip().strip('"').strip("'")
+        if value:
+            return value
+    return None
 
 
 def make_client(key: str):
@@ -123,6 +129,7 @@ def log_cost(cfg: dict, out: dict) -> None:
     p = cfg["price_usd_per_mtok"]
     usd = (out["tok_in"] * p["input"] + out["tok_out"] * p["output"]) / 1e6
     path = ROOT / cfg["cost_log"]
+    path.parent.mkdir(parents=True, exist_ok=True)
     new = not path.exists()
     with open(path, "a", newline="") as f:
         w = csv.writer(f)

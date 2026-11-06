@@ -1,5 +1,6 @@
 # ask.yaml: optional "Ask" box in the app, where a sales rep types a question and an LLM answers it.
-# OFF by default. The hosted app never calls an LLM (CLAUDE.md), so turn it on only on your own machine.
+# ON in the hosted app (user decision 2026-11-07). The key lives in Streamlit Cloud secrets (or .env locally),
+# never in the repo. false = tab hidden, no LLM calls at all.
 #
 # How an answer is made (app/ask.py), 2 LLM calls per question:
 #   1. the model picks ONE of the fixed tools below and its arguments (JSON, checked)
@@ -9,8 +10,10 @@
 
 enabled: true
 
+max_questions_per_session: 10   # public link: caps what one browser session can spend (repeats are free)
+
 api_key_env: [GROQ_ASK_API_KEY, GROQ_API_KEY]   # first one that is set wins: a separate key for chat,
-                                                # else the pipeline's key (from the shell or .env)
+                                                # else the pipeline's key (shell, Streamlit secrets or .env)
 model: openai/gpt-oss-120b
 temperature: 0
 max_rows: 25                  # most rows a tool returns (and the model sees)

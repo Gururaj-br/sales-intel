@@ -1,5 +1,5 @@
-"""Sales intel app: reads ONLY data/out/*.parquet (precomputed). No LLM calls, no API keys.
-(Exception, off by default: the "Ask" tab in config/ask.yaml, for local use with your own key.)
+"""Sales intel app: rankings come ONLY from data/out/*.parquet (precomputed, no LLM at view time).
+Optional "Ask" tab (config/ask.yaml): an LLM answers rep questions from those rows; key from Streamlit secrets / .env.
 
 Confidence is computed here, live, from the evidence rows of each account:
   confidence = mean owner-proof weight of its finding rows * mean evidence strength of its findings
@@ -177,7 +177,8 @@ which company owns each server. This demo uses the first 500,000 records of a 13
    the internet, software past end of life, old encryption, expired certificates.
 4. **Clean up names with AI (done once, offline).** An AI model reads each owner name and flags ones that are
    not a real customer, e.g. a hosting company or a device maker whose name is printed on certificates of
-   devices it sold. It is checked against a gold set of 110 names. The app itself makes no AI calls.
+   devices it sold. It is checked against a gold set of 110 names. The ranking itself uses no AI at view time;
+   only the optional Ask tab calls an AI model, to answer questions from these same accounts.
 5. **Rank.** Each problem type adds points: how bad it is (0-10) x how many servers have it (more servers
    add points, but less each time) x how recent it is.
 
@@ -207,17 +208,24 @@ if ASK["enabled"]:
     with tabs[2]:
         key = ask.api_key(ASK)
         if not key:
-            st.info(f"Ask is on but no API key is set: put {' or '.join(ASK['api_key_env'])} in .env.")
+            st.info(f"Ask is on but no API key is set: add {' or '.join(ASK['api_key_env'])} "
+                    "to Streamlit secrets (hosted) or .env (local).")
         else:
             @st.cache_data(show_spinner=False)
             def cached_ask(question: str) -> dict:          # same question again = no new API call
                 return ask.ask(question, acc, fnd, ASK, ask.make_client(key))
 
             st.caption("Answers come from an AI model, using only the accounts in this app. "
-                       "The rows it used are shown under the answer.")
+                       f"The rows it used are shown under the answer. Up to {ASK['max_questions_per_session']} "
+                       "questions per session.")
             question = st.text_input("Ask about the accounts",
                                      placeholder="e.g. Which companies in Brazil have open remote desktop?", key="ask_q")
-            if question.strip():
+            asked = st.session_state.setdefault("ask_asked", set())   # distinct questions this session
+            limit = ASK["max_questions_per_session"]
+            if question.strip() and question.strip() not in asked and len(asked) >= limit:
+                st.warning(f"You have used all {limit} questions for this session. Reload the page to start a new one.")
+            elif question.strip():
+                asked.add(question.strip())
                 with st.spinner("Thinking..."):
                     try:
                         res = cached_ask(question.strip())

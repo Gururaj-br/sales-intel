@@ -3,7 +3,7 @@
 **Find, rank and pitch companies that have visible security problems on their internet-facing servers.**
 Built from Shodan-style internet scan data for the sales team of a cybersecurity software company.
 
-**Live app:** https://sales-intel-wgbpzzn9khttipxii3r6rq.streamlit.app/ (no login, no API keys, no AI calls at view time)
+**Live app:** https://sales-intel-wgbpzzn9khttipxii3r6rq.streamlit.app/ (no login; rankings are precomputed, only the optional Ask tab calls an AI model)
 
 > **Scope of this proof of concept.** The input is one scan file of 13.5 million records (18 GB compressed).
 > The app and every number below come from its **first 500,000 records** (one of its 27 parts).
@@ -20,7 +20,7 @@ Built from Shodan-style internet scan data for the sales team of a cybersecurity
 | What do I pitch? | The product to offer for each problem, why the customer should care, and a suggested opening line |
 | Can I trust it? | A confidence score, computed live from the evidence and explained as two questions. Weak cases show "not enough proof" and no score |
 | What exactly did you see? | Every finding: server IP, port, problem, technical detail and date seen |
-| (optional, local only) Can I just ask? | An **Ask** tab: type a question, get a short answer plus the rows it came from. Off by default, see below |
+| Can I just ask? | An **Ask** tab: type a question, get a short answer plus the rows it came from (see Run it) |
 
 ## How it works
 
@@ -58,7 +58,7 @@ Recency halves every 30 days. The same IP + port seen again in a later scan coun
 | Exclusions, ownership proof, findings, score | **Rules** in YAML | Auditable: every rank can be traced to config lines and evidence rows |
 | Owner-name clean-up | **LLM** (Groq, `openai/gpt-oss-120b`), offline | The long tail of hosting firms and device makers can't be hand-listed; hand-made lists stopped converging after several rounds of review |
 | Confidence | **Computed** per account from its own evidence rows, live in the app | Never a constant per level |
-| Ask tab (optional, off by default) | **LLM** picks one of 3 fixed lookups and words the answer from its rows | The model never writes queries and never sees data beyond the rows returned |
+| Ask tab (optional, config switch) | **LLM** picks one of 3 fixed lookups and words the answer from its rows | The model never writes queries and never sees data beyond the rows returned |
 | Machine-learning model | **None** | There are no outcome labels (won/lost deals) to train on; a model would only learn our own rules back |
 
 Guardrails on the LLM step (`pipeline/classify.py`): fixed JSON answer format checked against the allowed labels,
@@ -173,8 +173,9 @@ pytest -q                       # tests
 ```
 `python -m orchestrator score --dry-run` shows how many owner names the LLM step would label (and pay for) before running it.
 
-**Ask tab (optional, local only).** The hosted app never calls an LLM, so the tab is off by default.
-To use it on your machine: set `enabled: true` in `config/ask.yaml` and put `GROQ_ASK_API_KEY` (or `GROQ_API_KEY`) in `.env`.
+**Ask tab.** Switched by `enabled` in `config/ask.yaml` (on in the hosted app; `false` hides the tab and makes no calls).
+The key is `GROQ_ASK_API_KEY` (or `GROQ_API_KEY`): in Streamlit Cloud secrets for the hosted app, in `.env` locally, never in the repo.
+The public link is capped at `max_questions_per_session` (10) new questions per browser session.
 For each question the model picks one fixed lookup (`top_accounts`, `find_account`, `count_by`) as checked JSON,
 our code runs it on `data/out`, and the model answers from those rows only; the rows are shown under the answer.
 Two calls per question, cached while the app runs, cost logged to `logs/ask_cost.csv`.
@@ -187,7 +188,7 @@ Two calls per question, cached while the app runs, cost logged to `logs/ask_cost
 | `pipeline/` | one file per stage (`ingest`, `eligibility`, `attribute`, `findings`, `classify` (LLM), `score`); each handles one part file and is called by the orchestrator |
 | `config/` | every rule and setting: exclusions, findings, scoring, LLM, app text, orchestrator |
 | `app/app.py` | Streamlit app (reads `data/out` only) |
-| `app/ask.py` | optional Ask tab: fixed lookups + LLM answer (off by default, `config/ask.yaml`) |
+| `app/ask.py` | optional Ask tab: fixed lookups + LLM answer (`config/ask.yaml`) |
 | `eval/` | gold set and evaluation script |
 | `prompts/` | LLM prompts (versioned) |
 | `tests/` | unit and end-to-end tests (fake S3 and fake LLM: no network needed) |

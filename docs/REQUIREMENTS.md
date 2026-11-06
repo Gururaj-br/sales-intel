@@ -14,7 +14,7 @@
 - Idempotent ingestion: per-part manifest (name, hash, row count, status); reruns skip completed parts.
 - Stateless per-part processing; scale-out = one worker per part. Read only needed columns.
 - Data contracts (pandera) at each stage; bad parts quarantined.
-- Hosted app: small file (<~200 MB), no secrets, no LLM calls.
+- Hosted app: small file (<~200 MB); rankings precomputed. Only the optional Ask tab calls an LLM, key in Streamlit secrets, capped per session.
 - Every LLM step: schema-validated JSON, temperature 0, cache by content hash, "unknown" fallback, measured accuracy and cost.
 
 ## Edge cases

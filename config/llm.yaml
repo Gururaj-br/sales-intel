@@ -1,5 +1,5 @@
 # llm.yaml: the ONE LLM step (docs/DECISIONS.md D7): classify owner names of accounts that would be ranked.
-# Offline only: pipeline/classify.py writes data/llm/org_labels.parquet; the hosted app never calls an LLM.
+# Offline only: pipeline/classify.py writes data/llm/org_labels.parquet; the hosted app never runs this step.
 # Guardrails (CLAUDE.md): JSON output checked against labels, temperature 0, cache, "unknown"
 # fallback, gold-set check (eval/eval_orgs.py), cost logged (logs/llm_cost.csv).
 

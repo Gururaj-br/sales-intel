@@ -56,7 +56,7 @@ def load_env(path: Path = ROOT / ".env") -> None:
     """Read KEY=value lines from .env into os.environ (offline LLM step only).
 
     A variable already set in the shell wins over .env. Missing file = no-op.
-    .env is git-ignored; .env.example lists the keys. The hosted app needs no keys.
+    .env is git-ignored; .env.example lists the keys. The hosted app reads keys from Streamlit secrets.
     """
     import os
 
