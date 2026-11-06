@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import polars as pl
+import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 COLS = ["name", "country", "domain", "score", "confidence", "status", "reasons", "pitch"]
@@ -54,6 +55,22 @@ def count_by(acc, fnd, max_rows, field="country") -> pl.DataFrame:
     col = COUNT_FIELDS[field]
     return (ranked.group_by(col).len("ranked accounts").rename({col: field})
             .sort(["ranked accounts", field], descending=[True, False]).head(max_rows))
+
+
+def problems(acc, fnd, name: str) -> pl.DataFrame:
+    """One row per problem of one company, with the plain sales text from config/explain.yaml, worst first."""
+    explain = yaml.safe_load((ROOT / "config" / "explain.yaml").read_text())["findings"]
+    keys = acc.filter(pl.col("name") == name)["owner_key"].implode()
+    per = (fnd.filter(pl.col("owner_key").is_in(keys)).group_by("finding")
+           .agg(pl.col("ip_str").n_unique().alias("servers"), pl.col("severity").max().round(1).alias("severity"),
+                pl.col("pitch").first().alias("product"))
+           .sort(["severity", "finding"], descending=[True, False]))
+    return per.with_columns(*[pl.col("finding").replace_strict({k: v.get(f, "") for k, v in explain.items()},
+                                                               default="").alias(col)
+                              for f, col in [("title", "problem"), ("what", "what it means"),
+                                             ("why", "why they care"), ("talk", "opening line")]]
+                            ).select("problem", "servers", "severity", "product", "what it means",
+                                     "why they care", "opening line")
 
 
 TOOLS = {"top_accounts": top_accounts, "find_account": find_account, "count_by": count_by}
@@ -115,12 +132,17 @@ def ask(question: str, acc: pl.DataFrame, fnd: pl.DataFrame, cfg: dict, client) 
     text, t_in, t_out = _call(client, cfg, tool_prompt, question, json_mode=True)
     tool, args = pick_tool(text, findings)
     if tool == "none":
-        out = {"answer": NO_TOOL, "tool": tool, "args": {}, "rows": None, "tok_in": t_in, "tok_out": t_out}
+        out = {"answer": NO_TOOL, "tool": tool, "args": {}, "rows": None, "details": None,
+               "tok_in": t_in, "tok_out": t_out}
     else:
         rows = TOOLS[tool](acc, fnd, cfg["max_rows"], **args)
         user = f"Question: {question}\n\nRows ({rows.height}):\n{json.dumps(rows.to_dicts(), ensure_ascii=False)}"
+        details = problems(acc, fnd, rows["name"][0]) if tool == "find_account" and rows.height == 1 else None
+        if details is not None:          # one company: give the model the sales text for each of its problems
+            user += f"\n\nProblems of this company ({details.height}):\n{json.dumps(details.to_dicts(), ensure_ascii=False)}"
         answer, a_in, a_out = _call(client, cfg, (ROOT / cfg["answer_prompt"]).read_text(), user, json_mode=False)
-        out = {"answer": answer, "tool": tool, "args": args, "rows": rows, "tok_in": t_in + a_in, "tok_out": t_out + a_out}
+        out = {"answer": answer, "tool": tool, "args": args, "rows": rows, "details": details,
+               "tok_in": t_in + a_in, "tok_out": t_out + a_out}
     log_cost(cfg, out)
     return out
 

@@ -237,3 +237,5 @@ if ASK["enabled"]:
                     if res["rows"] is not None:
                         with st.expander(f"Data used: {res['tool']} {res['args']} ({res['rows'].height} rows)"):
                             st.dataframe(res["rows"], hide_index=True, width="stretch")
+                            if res.get("details") is not None:
+                                st.dataframe(res["details"], hide_index=True, width="stretch")

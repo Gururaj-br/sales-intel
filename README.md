@@ -178,6 +178,7 @@ The key is `GROQ_ASK_API_KEY` (or `GROQ_API_KEY`): in Streamlit Cloud secrets fo
 The public link is capped at `max_questions_per_session` (10) new questions per browser session.
 For each question the model picks one fixed lookup (`top_accounts`, `find_account`, `count_by`) as checked JSON,
 our code runs it on `data/out`, and the model answers from those rows only; the rows are shown under the answer.
+For a single company it also gets each problem's plain sales text (`config/explain.yaml`), so it can write a short pitch plan.
 Two calls per question, cached while the app runs, cost logged to `logs/ask_cost.csv`.
 `python eval/eval_ask.py` scores the tool choice on 10 gold questions (`eval/ask_questions.yaml`).
 

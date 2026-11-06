@@ -24,9 +24,12 @@ ACC = pl.DataFrame({
     "pitch": ["Vulnerability management", "Zero trust access", "Zero trust access", "Zero trust access"],
     "status": ["ranked", "ranked", "ranked", "abstain"],
 })
-FND = pl.DataFrame({"owner_key": ["acme", "bright", "nordic", "nordic", "ghost"],
-                    "finding": ["has_cve", "rdp", "rdp", "rdp", "rdp"]})
-FINDINGS = ["has_cve", "rdp"]
+FND = pl.DataFrame({"owner_key": ["acme", "acme", "bright", "nordic", "nordic", "ghost"],
+                    "finding": ["has_cve", "old_tls", "rdp", "rdp", "rdp", "rdp"],
+                    "ip_str": ["1.1.1.1", "1.1.1.1", "2.2.2.2", "3.3.3.3", "3.3.3.4", "4.4.4.4"],
+                    "severity": [9.8, 4.0, 9.0, 9.0, 9.0, 9.0],
+                    "pitch": ["Vulnerability management", "Certificate / TLS hygiene"] + ["Zero trust access"] * 4})
+FINDINGS = ["has_cve", "old_tls", "rdp"]
 
 
 class FakeClient:
@@ -72,7 +75,7 @@ def test_find_account_shows_abstained_with_status():
 
 def test_count_by():
     assert ask.count_by(ACC, FND, 25, field="country").rows() == [("BR", 2), ("US", 1)]
-    assert ask.count_by(ACC, FND, 25, field="finding").rows() == [("rdp", 2), ("has_cve", 1)]   # per account
+    assert ask.count_by(ACC, FND, 25, field="finding").rows() == [("rdp", 2), ("has_cve", 1), ("old_tls", 1)]   # per account
 
 
 @pytest.mark.parametrize("text", [
@@ -102,3 +105,19 @@ def test_ask_none_makes_one_call_only(cfg):
     client = FakeClient('{"tool": "none", "args": {}}')
     res = ask.ask("what's the weather?", ACC, FND, cfg, client)
     assert res["answer"] == ask.NO_TOOL and res["rows"] is None and len(client.calls) == 1
+
+
+def test_one_company_gets_sales_text_per_problem(cfg):
+    client = FakeClient(json.dumps({"tool": "find_account", "args": {"name": "acme"}}))
+    res = ask.ask("what should I pitch to Acme?", ACC, FND, cfg, client)
+    d = res["details"]
+    assert d["problem"].to_list() == ["Software with known security holes", "Outdated encryption allowed"]  # worst first
+    assert d["product"].to_list() == ["Vulnerability management", "Certificate / TLS hygiene"]
+    assert d["opening line"].str.len_chars().min() > 20                 # text from config/explain.yaml
+    assert "Problems of this company (2)" in client.calls[1] and d["why they care"][0] in client.calls[1]
+
+
+def test_several_companies_get_no_problem_text(cfg):
+    client = FakeClient(json.dumps({"tool": "top_accounts", "args": {}}))
+    res = ask.ask("top accounts", ACC, FND, cfg, client)
+    assert res["details"] is None and "Problems of this company" not in client.calls[1]

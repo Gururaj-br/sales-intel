@@ -18,9 +18,9 @@ model: openai/gpt-oss-120b
 temperature: 0
 max_rows: 25                  # most rows a tool returns (and the model sees)
 
-prompt_version: v1
+prompt_version: v2                  # v2: one-company answers get per-problem sales text (explain.yaml)
 tool_prompt: prompts/ask_tool_v1.md
-answer_prompt: prompts/ask_answer_v1.md
+answer_prompt: prompts/ask_answer_v2.md
 
 cost_log: logs/ask_cost.csv
 price_usd_per_mtok:           # same model as config/llm.yaml; VERIFY on groq.com/pricing
