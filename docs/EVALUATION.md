@@ -23,7 +23,7 @@ Scope: the first 500,000 records of the scan file (one of 27 chunks). Script: `e
 |---|---|---|---|---|
 | Rules only | 10 / 25 | 0.55 | n/a | n/a |
 | Rules + LLM prompt v1 (3 gold names leaked) | 14 / 25 | 0.83 | 0.70 | 0.97 |
-| **Rules + LLM prompt v2 (kept)** | **15 / 25** | **0.85** | **0.77** | **0.94** |
+| **Rules + LLM prompt v2 (kept)** | **15 / 25** | **0.87** | **0.77** | **0.94** |
 
 - *Top-25 real companies*: of the 25 highest-ranked accounts, how many have gold label "company".
 - *Drop recall*: of the gold names that are infrastructure/default, the share the LLM removed.
@@ -32,8 +32,8 @@ Scope: the first 500,000 records of the scan file (one of 27 chunks). Script: `e
 - Remaining misses in the v2 top 25: software or device makers labelled company (Bitnami, Bitrix, VIMAR, V2Ray).
 
 ## Funnel (same data)
-500,000 records → 463,491 unique IP + port → 15,262 problems on owned servers → 14,690 after the LLM name check
-→ 6,819 accounts → 490 ranked, 6,329 "not enough proof".
+500,000 records → 463,491 unique IP + port → 15,262 problems on owned servers → 14,683 after the LLM name check
+→ 6,818 accounts → 489 ranked, 6,329 "not enough proof".
 
 ## Not done
 - Coverage-vs-precision curve for the abstain threshold (0.5 is a starting value).

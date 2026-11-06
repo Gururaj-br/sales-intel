@@ -75,20 +75,20 @@ plus a random sample, each labelled company / infrastructure / default / unknown
 |---|---|
 | Scan records → unique IP + port | 500,000 → 463,491 |
 | Problems found on servers with a proven owner | 15,262 |
-| Problems kept after the LLM name check | 14,690 |
-| Accounts (companies) | 6,819 |
-| Ranked (confidence ≥ 0.5) / "not enough proof" | 490 / 6,329 |
+| Problems kept after the LLM name check | 14,683 |
+| Accounts (companies) | 6,818 |
+| Ranked (confidence ≥ 0.5) / "not enough proof" | 489 / 6,329 |
 
 **Quality** (96 gold names with a definite label; 14 more are labelled "unknown" and left out):
 
 | Measure | Rules only | Rules + LLM |
 |---|---|---|
 | Real companies in the top 25 accounts | 10 | **15** |
-| Name labels matching the gold set | 0.55 | **0.85** |
+| Name labels matching the gold set | 0.55 | **0.87** |
 | Junk names removed (recall) | n/a | 0.77 |
 | Removals that were right (precision) | n/a | 0.94 (2 real companies wrongly removed) |
 
-LLM cost for this run: 772 owner names, 20 calls, about $0.05 at the prices in `config/llm.yaml`.
+LLM cost for this run: 772 owner names, 21 calls (one retry for 6 names a rate limit had left unanswered), about $0.05 at the prices in `config/llm.yaml`.
 The gold labels were drafted with AI help and **have not yet been reviewed by a person**, so these numbers are provisional.
 Full method and history: [docs/EVALUATION.md](docs/EVALUATION.md).
 

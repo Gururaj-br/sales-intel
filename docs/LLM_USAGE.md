@@ -3,7 +3,7 @@
 | Step | Model | Input unit | Calls | Tokens in/out | $ per 1k units | Cache hit | Accuracy vs gold |
 |---|---|---|---|---|---|---|---|
 | Org classification (prompt v1) | Groq openai/gpt-oss-120b | owner name of would-be-ranked account | 20 (40 names/call) | 25,350 / 38,356 | ~$0.06 per 1k names (VERIFY price) | 0% first run | drop precision 0.97, recall 0.70, exact 0.83 on 96 gold names (provisional) |
-| Org classification (prompt v2, KEPT) | Groq openai/gpt-oss-120b | owner name of would-be-ranked account | 20 (40 names/call) | 29,450 / 42,150 | ~$0.07 per 1k names (VERIFY price) | 0% (new prompt version) | drop precision 0.94, recall 0.77, exact 0.85 on 96 gold names (provisional) |
+| Org classification (prompt v2, KEPT) | Groq openai/gpt-oss-120b | owner name of would-be-ranked account | 20 (40 names/call) | 29,450 / 42,150 | ~$0.07 per 1k names (VERIFY price) | 0% (new prompt version) | drop precision 0.94, recall 0.77, exact 0.87 on 96 gold names (provisional; 0.85 before the 6 retried names) |
 | Gold pre-labeling | Claude (in the coding session) | gold name | n/a | n/a | n/a | n/a | drafts only; human review pending |
 
 Planned and **not built**: LLM drafting of finding rules for rare modules, LLM help on ambiguous ownership.
@@ -31,3 +31,5 @@ All keys of one Groq organization share that limit, so rotating keys does not he
 - 2026-11-05 v2 run: company 446 / default 192 / infrastructure 82 / unknown 52; 146 of 772 labels changed vs v1.
   Fixed: LaCie, VMware, Dell -> default. Still wrong: Bitnami, Bitrix, VIMAR, V2Ray (company), SITA dropped as infrastructure.
   One 429 rate limit (Groq free tier 8k tokens/min); retry recovered, 6 names unanswered -> unknown, retried next run.
+- 2026-11-05 retry run: the 6 unanswered names got labels (1 call). Now company 450 / default 194 / infrastructure 82 /
+  unknown 46; 276 names dropped (was 274). Ranked accounts 490 -> 489, exact label match 0.854 -> 0.865, recall and precision unchanged.
